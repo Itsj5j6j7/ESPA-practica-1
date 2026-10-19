@@ -8,9 +8,9 @@ Miniapp que resume un texto con IA. Se despliega de dos formas: serverless en Ve
 
 | Persona | Rol | Aportación |
 | --- | --- | --- |
-| _(nombre)_ | A · Backend y seguridad | _Pendiente_ |
-| _(nombre)_ | B · Frontend y Vercel | _Pendiente_ |
-| _(nombre)_ | C · Tests, infra, AWS y docs | _Pendiente_ |
+| Pablo | A · Tests y seguridad | _Pendiente_ |
+| Javier | B · Frontend y Vercel (integrador) | Scaffold del proyecto, flujo Git y README esqueleto; _resto pendiente_ |
+| Nicolas | C · Backend, infra y AWS | _Pendiente_ |
 
 - Práctica: UD1 · Explotación y despliegue de una aplicación con IA.
 - Miniapp: **Resumidor** (texto de 1 a 2000 caracteres → resumen breve).
@@ -20,13 +20,11 @@ Miniapp que resume un texto con IA. Se despliega de dos formas: serverless en Ve
 
 - **Lector:** alguien con conocimientos de Docker y cloud que quiere reproducir el despliegue sin hablar con nosotros.
 - **Estructura:** las 12 secciones del enunciado en un único README; capturas en `evidencias/` con nombre `fase-N_que-demuestra.png`.
-- **Reparto:** cada sección tiene responsable (ver cabecera de cada una) y solo lo edita esa persona, en la rama de la tarea que documenta.
+- **Reparto:** documentamos todos. Cada uno escribe lo que hace en la sección que corresponda, en la rama de la tarea que documenta.
 - **Actualización:** por hitos. Cada fase deja su sección escrita antes de mergear a `dev`; no se reconstruye al final.
 - **Guía consultada:** [Diátaxis](https://diataxis.fr/) (separar instrucciones, referencia y explicación).
 
 ## 3. Arquitectura
-
-<!-- responsable: B -->
 
 _Pendiente (Fase 2–3)._ Esquema previsto:
 
@@ -42,8 +40,6 @@ flowchart LR
 - EC2: un único contenedor; FastAPI sirve la API y `dist/`.
 
 ## 4. Requisitos e instalación local
-
-<!-- responsable: B -->
 
 Versiones con las que se ha creado el proyecto:
 
@@ -77,8 +73,6 @@ _Comprobación de extremo a extremo: pendiente (Fase 2)._
 
 ## 5. Variables de entorno
 
-<!-- responsable: A -->
-
 | Variable | Finalidad | Pública/Secreta | Dónde se configura | Momento de uso |
 | --- | --- | --- | --- | --- |
 | `AI_API_KEY` | Clave de OpenRouter | Secreta | `.env` local · Vercel env · archivo privado en EC2 | Ejecución |
@@ -91,37 +85,25 @@ El proveedor de IA es OpenRouter, que expone una API compatible con OpenAI (`htt
 
 ## 6. Vercel
 
-<!-- responsable: B -->
-
 _Pendiente (Fase 3)._
 
 ## 7. Clerk
-
-<!-- responsable: A -->
 
 _Pendiente (Fase 4)._
 
 ## 8. Docker
 
-<!-- responsable: C -->
-
 _Pendiente (Fase 5)._
 
 ## 9. AWS
-
-<!-- responsable: C -->
 
 _Pendiente (Fase 2 y 6)._
 
 ## 10. Operación y verificación
 
-<!-- responsable: A -->
-
 _Pendiente (Fase 1 en adelante)._
 
 ## 11. Problemas y soluciones
-
-<!-- responsable: C -->
 
 | Fase | Síntoma | Diagnóstico | Solución | Comprobación |
 | --- | --- | --- | --- | --- |
@@ -130,10 +112,8 @@ _Pendiente (Fase 1 en adelante)._
 
 ## 12. Git y evidencias
 
-<!-- responsable: C -->
-
 - **Ramas:** `main` (solo hitos, lleva los tags) ← `dev` (integración) ← ramas de tarea `<tipo>/<tema>` creadas desde `dev`.
-- **Integración:** el dueño del proyecto Vercel mergea las ramas a `dev` con merge commit (`--no-ff`), nunca squash, para conservar la autoría de cada commit.
+- **Integración:** Javier (dueño del proyecto Vercel) mergea las ramas a `dev` con merge commit (`--no-ff`), nunca squash, para conservar la autoría de cada commit.
 - **Commits:** Conventional Commits, en inglés, minúsculas e imperativo.
 
 | Hito | Rama | Contenido |

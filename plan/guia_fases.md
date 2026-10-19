@@ -4,13 +4,15 @@ Compañero de `plan.md` (reparto, ramas y commits). Aquí: **qué decirle a Clau
 
 ## Cómo pedírselo a Claude
 
+Personas: **A = Pablo** (tests y seguridad), **B = Javier** (frontend, Vercel, integrador), **C = Nicolas** (backend, infra, AWS). La documentación la hacemos todos.
+
 Abrid Claude Code **en la raíz del repo** (`ESPA-practica-1/`) y pegad:
 
 ```
 Lee plan/plan.md y plan/guia_fases.md (y el README). Soy la Persona <A|B|C>. Parte de la rama `dev` actualizada.
 Haz la Fase <N>, solo mis tareas. Trabaja en la rama indicada en el plan.
 No hagas commits ni push: dime el mensaje de cada commit en el orden del plan.
-No toques secciones del README que no sean mías. Nada fuera del alcance del enunciado.
+Documenta en el README lo que hago, solo en las líneas de mi parte. Nada fuera del alcance del enunciado.
 Si necesitas que yo haga algo en Vercel/Clerk/AWS, dame los pasos y espera mi salida.
 ```
 
@@ -26,11 +28,11 @@ Prompts cortos listos (cambiad la letra):
 
 | Fase | Prompt |
 | --- | --- |
-| 0 | `Persona C, Fase 0: crea .gitignore, .env.example y el esqueleto del README con las 12 secciones del enunciado y su responsable.` |
-| 1 | `Persona A, Fase 1: endpoint /api/generar y /api/health según el contrato del plan.` · `Persona C, Fase 1: tests de backend con el proveedor simulado (4 casos como máximo).` |
+| 0 | Hecha en `dev` por Javier. Cada uno: `Persona <X>, Fase 0: comprueba que mi entorno cumple la sección 4 del README y dime qué falta.` |
+| 1 | `Persona C, Fase 1: endpoint /api/generar y /api/health según el contrato del plan.` · `Persona A, Fase 1: tests de backend con el proveedor simulado (4 casos como máximo).` |
 | 2 | `Persona B, Fase 2: SPA React+TS+Tailwind (el scaffold ya existe) con un formulario, carga y error, contra el contrato.` · `Persona A, Fase 2: fija versiones de dependencias y completa la tabla de variables.` |
 | 3 | `Persona B, Fase 3: vercel.json y build para un único proyecto. Dame los comandos de CLI a ejecutar.` |
-| 4 | `Persona A, Fase 4: valida el token de Clerk en FastAPI como dependencia y añade los tests de rechazo.` · `Persona B, Fase 4: Clerk en la SPA y envío del Bearer.` |
+| 4 | `Persona C, Fase 4: valida el token de Clerk en FastAPI como dependencia.` · `Persona A, Fase 4: tests de rechazo sin token y de aceptación con verificador simulado.` · `Persona B, Fase 4: Clerk en la SPA y envío del Bearer.` |
 | 5 | `Persona A, Fase 5: Dockerfile multi-stage, .dockerignore y docker_app.py.` |
 | 6 | `Persona C, Fase 6: dame el procedimiento de despliegue en EC2 con mi tag y revisa mi README de AWS.` |
 | 7 | `Persona C, Fase 7: revisa el README contra el apartado 7 y el checklist del apartado 10 del enunciado y dime qué falta.` |
@@ -60,11 +62,13 @@ Prompts cortos listos (cambiad la letra):
 
 ## Fase 1 · Backend mínimo
 
-### Lo que hace Claude
+### Lo que hace Claude (Persona C · backend)
 - Cliente de IA: `OpenAI(api_key=AI_API_KEY, base_url="https://openrouter.ai/api/v1", timeout=20)` y `chat.completions.create(model=AI_MODEL, ...)`.
 - `api/index.py`: `app = FastAPI()`, `GET /api/health`, `POST /api/generar` (Pydantic: `texto` 1–2000), función `llamar_ia(texto)` aislada con timeout (~20 s), `AI_API_KEY`/`AI_MODEL` desde entorno, errores → 502/504 con mensaje genérico, sin trazas ni claves en logs.
 - `requirements.txt` (ya existe en `dev` sin versiones, con fastapi, uvicorn, openai, clerk-backend-api, pytest y httpx; añadid `python-dotenv` si lo usáis. Pydantic viene con FastAPI).
-- Persona C: `api/test_api.py` (o `tests/`) con 3 casos: ok (mock), entrada inválida, fallo del proveedor.
+
+### Lo que hace Claude (Persona A · tests)
+- `api/test_api.py` (o `tests/`) con 3 casos: ok (mock), entrada inválida, fallo del proveedor.
 
 ### Comprobar vosotros (local)
 ```bash
@@ -171,9 +175,11 @@ Provocad una incidencia real y diagnosticadla (p. ej. despliegue sin `AI_API_KEY
 - `App.tsx`: `<Show when="signed-out">` con `<SignInButton mode="modal" />` (el modal evita configurar páginas hospedadas) y `<Show when="signed-in">` con `<UserButton />` (incluye cerrar sesión) y el formulario. (`Show`, `SignInButton`, `UserButton`, `ClerkProvider` y `useAuth` existen en la v6 instalada; `SignedIn`/`SignedOut` ya no.)
 - En la llamada: obtener el token de sesión con el hook de Clerk (`const { getToken } = useAuth()`; `await getToken()`) y enviar `Authorization: Bearer <token>`. 401 → mensaje "inicia sesión".
 
-**Persona A (backend)**
+**Persona C (backend)**
 - Dependencia FastAPI que llama a `authenticate_request` con `CLERK_SECRET_KEY`, `authorized_parties` desde `CLERK_AUTHORIZED_PARTIES` y solo tokens de sesión; si no hay sesión válida → `HTTPException(401)`.
 - Aplicarla **solo** a `/api/generar`; `/api/health` queda público.
+
+**Persona A (tests)**
 - Tests: sin cabecera → 401; con verificador simulado → 200. Sin llamadas a Clerk reales en los tests.
 
 ### Pasos manuales (Clerk + Vercel) — Persona C
@@ -311,7 +317,7 @@ Tras la defensa: *Terminate* de la instancia, borrar volúmenes huérfanos, SG p
 
 ### Vosotros
 1. Tags finales publicados y apuntando a commits distintos: `git ls-remote --tags origin`.
-2. Cada uno ejecuta una operación del entorno que **no** montó (A: `vercel logs`; B: SSH + `docker logs`; C: explicar la dependencia de Clerk en FastAPI).
+2. Cada uno ejecuta una operación del entorno que **no** montó (C·Nicolas: `vercel logs`; A·Pablo: SSH + `docker logs`; B·Javier: explicar la dependencia de Clerk en FastAPI).
 3. Entrega: repo, tag + commit final, URL Vercel, URL EC2, README, presentación.
 4. Dejar EC2 y Vercel disponibles hasta que el profesorado diga; después limpiar recursos.
 
