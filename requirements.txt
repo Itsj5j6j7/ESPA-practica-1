@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+openai
+clerk-backend-api
+pytest
+httpx
