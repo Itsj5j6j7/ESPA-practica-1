@@ -2,15 +2,15 @@
 
 Miniapp que resume un texto con IA. Se despliega de dos formas: serverless en Vercel (Parte 1) y en un contenedor Docker sobre AWS EC2 (Parte 2), con autenticación Clerk en ambas.
 
-> Estado: **Fase 0 completada** (scaffold del frontend). Las secciones marcadas _Pendiente_ se rellenan en la fase indicada, en la misma rama que el cambio que documentan.
+> Estado: **Fase 0 completada** (scaffold del frontend) y **Fase 1 en curso**: backend de Nicolas integrado en `dev`, tests de Pablo en `test/a-backend-tests`. Las secciones marcadas _Pendiente_ se rellenan en la fase indicada, en la misma rama que el cambio que documentan.
 
 ## 1. Identificación
 
 | Persona | Rol | Aportación |
 | --- | --- | --- |
-| Pablo | A · Tests y seguridad | _Pendiente_ |
+| Pablo | A · Tests y seguridad | Fase 1: `api/test_api.py` (6 tests del contrato, proveedor simulado) y comprobación de que no se filtran detalles del proveedor; §4 y §10 (tests); _resto pendiente_ |
 | Javier | B · Frontend y Vercel (integrador) | Scaffold del proyecto, flujo Git y README esqueleto; _resto pendiente_ |
-| Nicolas | C · Backend, infra y AWS | _Pendiente_ |
+| Nicolas | C · Backend, infra y AWS | Fase 1: backend FastAPI en `api/index.py` (`GET /api/health`, `POST /api/generar` validado 1–2000, `llamar_ia` aislada con timeout de 20 s y errores 502/504 sin trazas); verificación real en §10, corrección de `AI_MODEL` en §11 e integración de las ramas de Fase 1 en `dev`; _resto pendiente_ |
 
 - Práctica: UD1 · Explotación y despliegue de una aplicación con IA.
 - Miniapp: **Resumidor** (texto de 1 a 2000 caracteres → resumen breve).
@@ -68,6 +68,15 @@ python -m venv .venv && source .venv/bin/activate   # fish: activate.fish
 pip install -r requirements.txt
 uvicorn api.index:app --reload --port 8000
 ```
+
+Tests (Python 3.14 local, `pytest` + `httpx` instalados con `pip install -r requirements.txt`):
+
+```bash
+pytest -q        # 6 passed en ~0.4 s
+```
+
+- Los tests viven en `api/test_api.py` y solo usan el contrato de la API: el proveedor se simula con `monkeypatch` sobre `api.index.llamar_ia`, sin llamadas a OpenRouter ni a Clerk.
+- `httpx` es obligatorio: es el transporte que usa `fastapi.testclient.TestClient`.
 
 _Comprobación de extremo a extremo: pendiente (Fase 2)._
 
@@ -132,6 +141,26 @@ curl -s -X POST localhost:8000/api/generar \
 
 Errores del proveedor: `502` genérico (sin trazas ni claves en la respuesta ni en logs) y `504` si se supera el timeout de 20 s.
 
+### Tests del contrato (Fase 1, rama `test/a-backend-tests`)
+
+```bash
+pytest -q
+```
+
+| Test | Qué comprueba | Resultado |
+| --- | --- | --- |
+| `test_health_is_public_and_ok` | `GET /api/health` → `200 {"status":"ok"}` | pass |
+| `test_generar_happy_path_with_mocked_provider` | `POST /api/generar` con texto válido → `200 {"resumen":…}` (proveedor simulado) | pass |
+| `test_generar_rejects_invalid_input` | `texto` vacío y `texto` de 2001 caracteres → `422` | pass (2 casos parametrizados) |
+| `test_generar_returns_generic_502_on_provider_failure` | El proveedor lanza error → `502` con mensaje genérico y sin detalle filtrado | pass |
+| `test_generar_returns_504_on_provider_timeout` | El proveedor supera el timeout → `504` | pass |
+
+```
+6 passed in 0.37s
+```
+
+Todos los tests son de contrato: se hace `monkeypatch.setattr("api.index.llamar_ia", …)` y no se realiza ninguna llamada real. El test de `502` comprueba además que el mensaje interno del proveedor no aparece en la respuesta.
+
 ## 11. Problemas y soluciones
 
 | Fase | Síntoma | Diagnóstico | Solución | Comprobación |
@@ -143,7 +172,7 @@ Errores del proveedor: `502` genérico (sin trazas ni claves en la respuesta ni 
 ## 12. Git y evidencias
 
 - **Ramas:** `main` (solo hitos, lleva los tags) ← `dev` (integración) ← ramas de tarea `<tipo>/<tema>` creadas desde `dev`.
-- **Integración:** Javier (dueño del proyecto Vercel) mergea las ramas a `dev` con merge commit (`--no-ff`), nunca squash, para conservar la autoría de cada commit.
+- **Integración:** Javier (dueño del proyecto Vercel) mergea las ramas a `dev` con merge commit (`--no-ff`), nunca squash, para conservar la autoría de cada commit. En la Fase 1, Nicolas integró sus dos ramas en `dev` con `--no-ff` y Pablo integra la suya de la misma forma.
 - **Commits:** Conventional Commits, en inglés, minúsculas e imperativo.
 
 | Hito | Rama | Contenido |
@@ -154,5 +183,8 @@ Errores del proveedor: `502` genérico (sin trazas ni claves en la respuesta ni 
 | Fase 0 | `build/python-requirements` | `requirements.txt` inicial |
 | Fase 0 | `docs/readme-skeleton` | Este README con las 12 secciones |
 | Fase 0 | `docs/team-plan` | `plan/` con el plan de trabajo y la guía de fases |
+| Fase 1 | `feat/c-generar-endpoint` | `api/index.py`: `health`, `generar`, validación y errores 502/504 (Nicolas) |
+| Fase 1 | `docs/c-fase1-backend` | Verificación con el modelo real y arreglo de `AI_MODEL` (§10 y §11) (Nicolas) |
+| Fase 1 | `test/a-backend-tests` | `api/test_api.py` (6 tests de contrato) y documentación en §1, §4, §10 y §12 (Pablo) |
 
 _Tags, releases y capturas: pendientes._
