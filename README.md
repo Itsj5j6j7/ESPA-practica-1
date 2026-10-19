@@ -142,5 +142,7 @@ _Pendiente (Fase 1 en adelante)._
 | Fase 0 | `build/scaffold-vite-react` | Scaffold Vite + React + TypeScript |
 | Fase 0 | `build/tailwind-clerk-deps` | Tailwind 4 y `@clerk/react` |
 | Fase 0 | `build/python-requirements` | `requirements.txt` inicial |
+| Fase 0 | `docs/readme-skeleton` | Este README con las 12 secciones |
+| Fase 0 | `docs/team-plan` | `plan/` con el plan de trabajo y la guía de fases |
 
 _Tags, releases y capturas: pendientes._
