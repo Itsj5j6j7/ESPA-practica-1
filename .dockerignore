@@ -1,0 +1,14 @@
+# Nunca entra en el contexto de build: secretos, dependencias e historia.
+.git
+node_modules
+dist
+.venv
+.env
+.env.*
+!.env.example
+.vercel
+*.pem
+evidencias
+plan
+__pycache__
+.pytest_cache
