@@ -5,9 +5,9 @@ Para pedirle una fase a Claude y ver los pasos manuales en Vercel/Clerk/AWS: `gu
 
 ## Estado actual (2026-10-19)
 
-- **Fase 0 hecha por el integrador** (dueño de Vercel): en `dev` ya están `.gitignore`, `.env.example`, scaffold Vite + React + TS, Tailwind 4, `@clerk/react` y `requirements.txt` (sin versiones fijadas), más el README con las 12 secciones. Todo eso se **da por hecho**: no lo rehagáis.
+- **Fase 0 hecha por Javier (B, integrador y dueño de Vercel)**: en `dev` ya están `.gitignore`, `.env.example`, scaffold Vite + React + TS, Tailwind 4, `@clerk/react` y `requirements.txt` (sin versiones fijadas), más el README con las 12 secciones. Todo eso se **da por hecho**: no lo rehagáis.
 - Empezad cada tarea con `git checkout dev && git pull && pnpm install`.
-- La carpeta `plan/` del repo (copia de este plan y de la guía) la sube el integrador; es lo que lee Claude.
+- La carpeta `plan/` del repo (copia de este plan y de la guía) la sube Javier; es lo que lee Claude.
 
 ## 0. Decisiones por defecto (cambiadlas en la Fase 0 si no os cuadran)
 
@@ -46,29 +46,31 @@ La llamada al proveedor vive en UNA función (llamar_ia) para poder simularla en
 | `CLERK_AUTHORIZED_PARTIES` | no secreta | ejecución | orígenes separados por coma (localhost, Vercel, `http://IP_EC2`) |
 | `VITE_CLERK_PUBLISHABLE_KEY` | pública | **compilación** | `.env` local · Vercel env · `--build-arg` en Docker |
 
-## 1. Roles (cada uno toca código, operaciones cloud y README)
+## 1. Roles (cada uno toca código, operaciones cloud y documentación)
 
-| | Rol | Fases donde lidera | Secciones README propias |
+| | Persona | Rol | Fases donde lidera |
 | --- | --- | --- | --- |
-| **A** | Backend y seguridad | F1, F4 (backend), F5 (Dockerfile) | 5 Variables, 7 Clerk, 10 Operación (tests) |
-| **B** | Frontend y Vercel | F2, F3, F4 (frontend) | 3 Arquitectura, 4 Instalación local, 6 Vercel |
-| **C** | Tests, infra, AWS y docs | F1 (tests), F2 (EC2 base), F6, F7 | 1 Identificación, 2 Plan doc., 8 Docker, 9 AWS, 11 Problemas, 12 Git y evidencias |
+| **A** | **Pablo** | Tests y seguridad | F1 (tests), F4 (tests), F5 (Dockerfile) |
+| **B** | **Javier** (integrador, dueño de Vercel y de la clave de OpenRouter) | Frontend y Vercel | F2, F3, F4 (frontend) |
+| **C** | **Nicolas** | Backend, infra y AWS | F1 (backend), F2 (EC2 base), F4 (backend), F6, F7 |
+
+**Documentación: la hacemos entre todos.** Cada uno escribe en el README lo que hace, en la misma rama que el cambio, en la sección que corresponda (no hay dueños de sección). La sección 1 (Identificación) y la tabla de problemas (§11) las rellena cada uno con lo suyo.
 
 **Regla de comprensión:** el profesorado puede preguntar a cualquiera por cualquier parte. En la Fase 7 cada persona ejecuta una vez, delante de las otras, una operación de cada entorno que *no* construyó (ver F7).
 
 ## 2. Flujo Git (ramas y commits)
 
 - `main` = solo hitos desplegables (lleva los tags). `dev` = integración. **Nadie hace push directo a `main` ni a `dev`.**
-- Rama por tarea, **creada desde `dev`**: `<tipo>/<persona>-<tema>`, p. ej. `feat/a-generar-endpoint`, `docs/c-ec2-setup`. Subidla con `git push -u origin <rama>` y avisad al integrador.
-- **El integrador (dueño de Vercel) mergea cada rama a `dev`** con `git merge --no-ff` (merge commit), sin PR obligatorio. **Nunca squash**: borra la autoría de cada commit y la rúbrica pide aportación individual identificable. Antes de avisar, rebasad vuestra rama sobre `dev` si ha avanzado.
-- Al cerrar un hito, el integrador mergea `dev` → `main` (`--no-ff`) y quien indique la fase crea el tag sobre ese commit.
+- Rama por tarea, **creada desde `dev`**: `<tipo>/<persona>-<tema>`, p. ej. `feat/c-generar-endpoint`, `docs/c-ec2-setup`. Subidla con `git push -u origin <rama>` y avisad a Javier.
+- **Javier (integrador) mergea cada rama a `dev`** con `git merge --no-ff` (merge commit), sin PR obligatorio. **Nunca squash**: borra la autoría de cada commit y la rúbrica pide aportación individual identificable. Antes de avisar, rebasad vuestra rama sobre `dev` si ha avanzado.
+- Al cerrar un hito, Javier mergea `dev` → `main` (`--no-ff`) y quien indique la fase crea el tag sobre ese commit.
 - 2–4 commits por rama, cada uno coherente y que deje el repo funcionando.
 - Cada uno con su identidad: `git config user.name "..."` y `git config user.email "..."` (el email de su cuenta de GitHub). Si hacéis pareja: `Co-authored-by: Nombre <email>` en el cuerpo del commit.
 - **Tags anotados** sobre el commit de `main` que cierra cada hito (no todos sobre el último commit):
   `git tag -a v0.1-backend -m "backend minimo" <sha> && git push origin v0.1-backend`
   y opcional `gh release create v0.1-backend --notes "..."`.
 - Antes de cada push, que salga vacío: `git diff --cached | grep -nEi 'sk-|sk_(test|live)_|BEGIN .*PRIVATE KEY|AKIA'`
-- README: **el esqueleto con las 12 secciones ya está en `dev`** con un `<!-- responsable: X -->` en cada una. Cada persona edita solo sus secciones, en la misma rama que el cambio que documenta. Los problemas reales se anotan en la tabla de §11 en cuanto ocurren (C la mantiene, pero cualquiera puede añadir una fila).
+- README: **el esqueleto con las 12 secciones ya está en `dev`** Todos lo completáis: cada uno documenta lo que hace en la misma rama que el cambio. Haced `git pull` de `dev` antes de editar y tocad solo las líneas de vuestra parte para evitar conflictos. Los problemas reales se anotan en la tabla de §11 en cuanto ocurren (cada uno añade su fila).
 - Evidencias (capturas) en `evidencias/` con nombre `fase-N_que-demuestra.png`. Recortad Account ID, ARN, claves y valores de variables.
 
 ## 3. Fases
@@ -79,24 +81,25 @@ Leyenda: **Hecho cuando** = criterio de salida. Los mensajes de commit son orien
 
 | Persona | Rama | Commits | Manual (fuera de Git) |
 | --- | --- | --- | --- |
-| **Integrador** | (hecho) `chore/gitignore-env-example`, `build/scaffold-vite-react`, `build/tailwind-clerk-deps`, `build/python-requirements`, `docs/readme-skeleton`, `docs/team-plan` | `.gitignore`, `.env.example`, scaffold React, dependencias, README esqueleto, `plan/` | Invitar a los otros dos como colaboradores con permiso de escritura |
-| **A** | `chore/a-ai-provider` | `docs: record ai provider and environment variables` (revisar la sección 5 del README, que ya tiene la tabla base) | Crear **vuestra** clave de OpenRouter con límite de gasto bajo y un modelo barato; `curl` real de prueba contra `https://openrouter.ai/api/v1/chat/completions` |
-| **B** | `chore/b-tooling` | `docs: record tool versions and local setup` (comprobad que la sección 4 funciona en vuestra máquina y corregidla) | `pnpm install` y `pnpm dev` funcionan; app en Clerk (instancia dev); Python. La cuenta de Vercel es del integrador |
+| **B · Javier** (integrador) | (hecho) `chore/gitignore-env-example`, `build/scaffold-vite-react`, `build/tailwind-clerk-deps`, `build/python-requirements`, `docs/readme-skeleton`, `docs/team-plan` | `.gitignore`, `.env.example`, scaffold React, dependencias, README esqueleto, `plan/` | Invitar a los otros dos como colaboradores con permiso de escritura |
+| **C** | `chore/c-ai-provider` | `docs: record ai provider and environment variables` (revisar la sección 5 del README, que ya tiene la tabla base) | Crear **tu** clave de OpenRouter con límite de gasto bajo y un modelo barato (no se comparte la de Javier); `curl` real de prueba contra `https://openrouter.ai/api/v1/chat/completions` |
+| **A** | `chore/a-test-tooling` | `docs: record python and pytest setup` (sección 4 del README) | Python, `.venv`, `pip install -r requirements.txt` y `pytest` funcionando en tu máquina |
+| **B** | `chore/b-tooling` | `docs: record tool versions and local setup` (comprobad que la sección 4 funciona en vuestra máquina y corregidla) | `pnpm install` y `pnpm dev` funcionan; app en Clerk (instancia dev); Python. La cuenta de Vercel es de Javier |
 
 C además: comprobar acceso a AWS Academy Learner Lab, Docker instalado en local (`docker run --rm hello-world`).
 **Hecho cuando:** `dev` tiene `.gitignore`, `.env.example`, el proyecto React y el README esqueleto; los 3 pueden clonar, instalar y hacer push a ramas; ningún secreto en el historial.
-**Aviso Vercel:** el plan Hobby puede no permitir añadir miembros al equipo. **El dueño del proyecto Vercel es el integrador** (tiene la cuenta). Las operaciones de CLI de A y C se hacen en sesión conjunta con B (compartir pantalla) y se registran con `Co-authored-by`. No compartáis tokens.
+**Aviso Vercel:** el plan Hobby puede no permitir añadir miembros al equipo. **El dueño del proyecto Vercel es Javier (B)**. Las operaciones de CLI de A y C se hacen en sesión conjunta con B (compartir pantalla) y se registran con `Co-authored-by`. No compartáis tokens.
 
 ### Fase 1 · Backend mínimo → `v0.1-backend` (A + C en paralelo)
 
 | Persona | Rama | Commits |
 | --- | --- | --- |
-| **A** | `feat/a-generar-endpoint` | `feat: add fastapi app with health endpoint` · `feat: add generar endpoint with input validation` · `feat: handle provider errors and timeouts without leaking details` |
-| **C** | `test/c-backend-tests` | `test: add generar happy path with mocked provider` · `test: cover invalid input and provider failure` |
+| **C** | `feat/c-generar-endpoint` | `feat: add fastapi app with health endpoint` · `feat: add generar endpoint with input validation` · `feat: handle provider errors and timeouts without leaking details` |
+| **A** | `test/a-backend-tests` | `test: add generar happy path with mocked provider` · `test: cover invalid input and provider failure` |
 
-C escribe los tests contra el **contrato** (monkeypatch de `llamar_ia`), sin esperar a que A termine.
+A (Pablo) escribe los tests contra el **contrato** (monkeypatch de `llamar_ia`), sin esperar a que C (Nicolas) termine el backend.
 **Hecho cuando:** `pytest` pasa (3 casos: ok, entrada inválida, fallo del proveedor); una prueba real controlada con `curl` devuelve resumen; con la clave mal puesta devuelve 502 sin trazas.
-**Tag:** `v0.1-backend` lo crea **A** tras mergear ambas ramas.
+**Tag:** `v0.1-backend` lo crea **C** tras mergear ambas ramas.
 
 ### Fase 2 · Frontend mínimo → `v0.2-frontend` (B lidera; C prepara EC2 en paralelo)
 
@@ -125,11 +128,12 @@ C aquí no escribe código: **lanza la EC2 ya** (Learner Lab es el cuello de bot
 
 | Persona | Rama | Commits |
 | --- | --- | --- |
-| **A** | `feat/a-clerk-backend` | `feat: validate clerk session token in fastapi dependency` · `test: reject generar request without token` · `test: accept request with valid token using mocked verifier` |
+| **C** | `feat/c-clerk-backend` | `feat: validate clerk session token in fastapi dependency` |
+| **A** | `test/a-clerk-tests` | `test: reject generar request without token` · `test: accept request with valid token using mocked verifier` |
 | **B** | `feat/b-clerk-frontend` | `feat: add clerk provider and sign in/out controls` · `feat: send session token to generar endpoint` · `feat: show unauthenticated state instead of the form` |
 | **C** | `chore/c-clerk-config` | `chore: add clerk variables to env example` · `docs: add clerk configuration and rejection evidence` |
 
-A y B trabajan contra el contrato (`Authorization: Bearer`, 401). C configura Clerk/Vercel y prueba.
+C, A y B trabajan contra el contrato (`Authorization: Bearer`, 401). C además configura Clerk/Vercel y prueba.
 **Riesgo a destapar ya (C):** que la instancia dev de Clerk funcione desde `http://IP_EC2` (HTTP). Probadlo con la SPA en cuanto exista (F5 anticipado si hace falta). Si falla, documentadlo y consultad al profesorado; **no quitéis la auth**.
 **Hecho cuando:** login/logout en producción; petición autenticada OK; `curl` directo sin token a `/api/generar` → 401 de **FastAPI** (ver aviso de Deployment Protection en la guía).
 **Tag:** `v0.4-auth` lo crea **B**.
@@ -166,7 +170,7 @@ A y B trabajan contra el contrato (`Authorization: Bearer`, 401). C configura Cl
 
 - Auditoría de secretos en **todo** el historial: `git log -p --all | grep -nEi 'sk-|sk_(test|live)_|BEGIN .*PRIVATE KEY|AKIA'` (vacío). Revisad también capturas y diapositivas.
 - Presentación: un archivo/enlace; cada persona presenta una parte (propuesta: A seguridad+Clerk, B Vercel+Git, C Docker+AWS+operación).
-- Ensayo de comprensión cruzada: A ejecuta `vercel logs`; B entra por SSH y hace `docker logs`; C explica y muestra la validación del token en FastAPI.
+- Ensayo de comprensión cruzada: C (Nicolas) ejecuta `vercel logs`; A (Pablo) entra por SSH y hace `docker logs`; B (Javier) explica y muestra la validación del token en FastAPI.
 - Entrega: repo, tag+commit final, URL Vercel, URL HTTP EC2, README, presentación.
 - Después de la defensa: parar/terminar EC2 y recursos asociados (volumen, IPs); revocar claves de IA y Clerk de la práctica.
 
@@ -180,7 +184,7 @@ F0 ──► F1 (A,C) ──► F2 (B; C: EC2; A: CORS) ──► F3 (B,C,A) ─
 
 - **Clase presencial (4 h):** F0, F1, F2 en paralelo y arrancar F3 con el profesor cerca (Vercel/Clerk son lo que más dudas generan).
 - **En casa:** F3 completa, F4, F5, F6 (reservad una sesión larga de Learner Lab), F7.
-- Cada merge a `main` actualiza la sección de README correspondiente **en la misma rama**: la documentación se escribe a la vez, no al final.
+- Cada merge actualiza el README **en la misma rama**: la documentación la escribimos todos a la vez, no al final.
 
 ## 5. Lista de riesgos
 
