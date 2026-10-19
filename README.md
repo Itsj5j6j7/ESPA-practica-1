@@ -101,7 +101,36 @@ _Pendiente (Fase 2 y 6)._
 
 ## 10. Operación y verificación
 
-_Pendiente (Fase 1 en adelante)._
+### Backend mínimo (Fase 1)
+
+Arranque local del backend (usa `api/index.py`; las variables se cargan de `.env` con `python-dotenv`):
+
+```bash
+python -m venv .venv && source .venv/bin/activate   # fish: activate.fish
+pip install -r requirements.txt
+uvicorn api.index:app --reload --port 8000
+```
+
+Comprobaciones ejecutadas (2026-10-19, contra el modelo real de OpenRouter configurado en `.env`):
+
+| Comando | Resultado |
+| --- | --- |
+| `GET /api/health` | `200 {"status":"ok"}` |
+| `POST /api/generar` con `{"texto":""}` | `422` (validación Pydantic, 1–2000) |
+| `POST /api/generar` con 2001 caracteres | `422` (validación Pydantic) |
+| `POST /api/generar` con texto válido | `200 {"resumen":"…"}` (resumen real) |
+| `POST /api/generar` con `AI_API_KEY` inválida | `502 {"detail":"El servicio de IA no está disponible"}` |
+
+Ejemplo de llamada:
+
+```bash
+curl -s localhost:8000/api/health
+curl -s -X POST localhost:8000/api/generar \
+  -H 'content-type: application/json' \
+  -d '{"texto":"Texto de prueba largo suficiente para resumir."}'
+```
+
+Errores del proveedor: `502` genérico (sin trazas ni claves en la respuesta ni en logs) y `504` si se supera el timeout de 20 s.
 
 ## 11. Problemas y soluciones
 
@@ -109,6 +138,7 @@ _Pendiente (Fase 1 en adelante)._
 | --- | --- | --- | --- | --- |
 | 0 | `pnpm create vite .` se cancela en un repo con archivos | Vite pide directorio vacío | Generar el scaffold en una carpeta temporal y copiarlo sin pisar `.gitignore` ni `README.md` | `pnpm build` y `pnpm install --frozen-lockfile` en limpio |
 | 0 | `@clerk/clerk-react` aparece como deprecado | Clerk lo renombró a `@clerk/react` en Core 3 | Usar `@clerk/react` | `pnpm view @clerk/clerk-react deprecated` |
+| 1 | `POST /api/generar` devuelve `502` y el log muestra `NotFoundError` | El modelo de `AI_MODEL` no existe en OpenRouter (`No endpoints found for <modelo>`) | Cambiar `AI_MODEL` a un modelo válido y disponible (`nvidia/nemotron-3.5-lightning:free`) | `POST /api/generar` con texto válido devuelve `200` y resumen real |
 
 ## 12. Git y evidencias
 
