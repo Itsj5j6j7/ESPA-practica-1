@@ -136,6 +136,8 @@ Verificación contra el alias de producción:
 | `POST /api/generar` con texto válido | `200 {"resumen":"…"}` (resumen real, ~38 s la primera vez con el modelo gratuito) |
 | `POST /api/generar` con `texto` vacío | `422` |
 
+**Ramas y despliegues:** la rama de producción del proyecto es `main` (comprobado con `vercel api /v9/projects/<id>`, campo `link.productionBranch`), así que producción solo cambia al integrar `dev` en `main` en un hito. Para que cada push a `dev` no genere un despliegue de preview, `vercel.json` lleva `"git": {"deploymentEnabled": {"dev": false}}`; los despliegues manuales (`vercel deploy`) siguen funcionando.
+
 **Deployment Protection:** está activa (Vercel Authentication) para las URLs propias de cada despliegue (`espa-practica-1-<hash>-<equipo>.vercel.app` responde `302` al login de Vercel), pero **no** para el alias de producción, que es público. Las comprobaciones con `curl` y las evidencias de rechazo se hacen siempre contra el alias.
 
 _Pendiente: capturas del proyecto y de las variables en Vercel (sin valores)._
