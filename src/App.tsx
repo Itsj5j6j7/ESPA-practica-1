@@ -5,16 +5,36 @@ const MAX_CHARS = 2000
 export default function App() {
   const [texto, setTexto] = useState('')
   const [resumen, setResumen] = useState('')
+  const [cargando, setCargando] = useState(false)
+  const [error, setError] = useState('')
 
   async function resumir(e: React.FormEvent) {
     e.preventDefault()
-    const res = await fetch('/api/generar', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ texto }),
-    })
-    const data = await res.json()
-    setResumen(data.resumen)
+    setCargando(true)
+    setError('')
+    setResumen('')
+    try {
+      const res = await fetch('/api/generar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texto }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        // 422 trae `detail` como lista de errores de validación; 502/504 como texto
+        setError(
+          typeof data.detail === 'string'
+            ? data.detail
+            : 'El texto no es válido: debe tener entre 1 y 2000 caracteres',
+        )
+        return
+      }
+      setResumen(data.resumen)
+    } catch {
+      setError('No se pudo conectar con el servidor')
+    } finally {
+      setCargando(false)
+    }
   }
 
   return (
@@ -35,13 +55,21 @@ export default function App() {
           </span>
           <button
             type="submit"
-            disabled={!texto.trim()}
+            disabled={cargando || !texto.trim()}
             className="rounded bg-indigo-600 px-4 py-2 text-white disabled:opacity-50"
           >
-            Resumir
+            {cargando ? 'Resumiendo…' : 'Resumir'}
           </button>
         </div>
       </form>
+      {error && (
+        <p
+          role="alert"
+          className="mt-6 rounded border border-red-300 bg-red-50 p-3 text-red-800"
+        >
+          {error}
+        </p>
+      )}
       {resumen && (
         <section className="mt-6 rounded border border-gray-200 bg-gray-50 p-4">
           <h2 className="font-semibold">Resumen</h2>
