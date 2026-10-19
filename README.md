@@ -100,7 +100,25 @@ Para probar la app completa en local hacen falta **dos terminales**: el backend 
 
 ## 6. Vercel
 
-_Pendiente (Fase 3)._
+**Un único proyecto** (`espa-practica-1`) sirve la SPA y la API desde la raíz del repo:
+
+| Pieza | Cómo la sirve Vercel |
+| --- | --- |
+| SPA | Framework **Vite**: `pnpm build` (`tsc -b && vite build`) genera `dist/`, que se publica como estático |
+| API | `api/index.py` es una función serverless de Python (FastAPI, `app` de nivel de módulo); sus dependencias salen de `requirements.txt` |
+| Rutas | `rewrites` de `vercel.json`: `/api/(.*)` → `/api/index.py`; FastAPI resuelve `/api/health` y `/api/generar` con sus propias rutas |
+
+`vercel.json` fija `framework`, `buildCommand`, `outputDirectory` y el *rewrite*; `.vercelignore` deja fuera del despliegue `api/test_api.py` (Vercel lo trataría como una segunda función y no tiene `app`), `docker_app.py`, `Dockerfile` y `plan/`. Las variables de entorno se añaden con `vercel env add` (§5) y **no** están en el repositorio. No hay CORS: SPA y API comparten origen.
+
+Comandos de la Fase 3 (el dueño del proyecto es Javier; los de otras personas se hacen en sesión conjunta con `Co-authored-by`):
+
+```bash
+vercel link                 # crea/enlaza el proyecto en la raíz (deja .vercel/, ignorado por Git)
+vercel deploy               # Preview
+vercel deploy --prod        # producción
+```
+
+_Pendiente: URL de producción, salida de los comandos y capturas (Fase 3)._
 
 ## 7. Clerk
 
@@ -239,6 +257,7 @@ Comprobaciones ejecutadas (2026-10-19, backend con `uvicorn` en `:8000` y `pnpm 
 | Fase 1 | `test/a-backend-tests` | `api/test_api.py` (6 tests de contrato) y documentación en §1, §4, §10 y §12 (Pablo) |
 | Fase 2 | `chore/a-reproducible-deps` | `requirements.txt` con versiones fijadas y tabla de variables de entorno completada (§4 y §5) (Pablo) |
 | Fase 2 | `feat/b-spa` | `src/App.tsx` (formulario, carga y error) y proxy `/api` en `vite.config.ts` + documentación en §1, §4, §10 y §11 (Javier) |
+| Fase 3 | `build/b-vercel-config` | `vercel.json` (Vite + rewrite `/api/*`), `.vercelignore` y documentación en §6 (Javier) |
 | Fase 5 | `build/a-dockerfile` | `Dockerfile` multi-stage, `docker_app.py` y `.dockerignore` + verificación local del contenedor (§8) (Pablo) |
 
 _Tags, releases y capturas: pendientes._
