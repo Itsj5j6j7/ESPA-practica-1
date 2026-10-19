@@ -2,13 +2,13 @@
 
 Miniapp que resume un texto con IA. Se despliega de dos formas: serverless en Vercel (Parte 1) y en un contenedor Docker sobre AWS EC2 (Parte 2), con autenticación Clerk en ambas.
 
-> Estado: **Fase 0 completada** (scaffold del frontend) y **Fase 1 en curso**: backend de Nicolas integrado en `dev`, tests de Pablo en `test/a-backend-tests`. Las secciones marcadas _Pendiente_ se rellenan en la fase indicada, en la misma rama que el cambio que documentan.
+> Estado: **Fases 0, 1 y 2 integradas en `dev`** (backend y verificación de Nicolas; tests, dependencias fijadas y variables de Pablo) y **Fase 5 hecha por Pablo** (`Dockerfile` multi-stage + verificación local del contenedor). Pendientes: Vercel (Fase 3, Javier), Clerk (Fase 4) y EC2 (Fase 6). Las secciones marcadas _Pendiente_ se rellenan en la fase indicada, en la misma rama que el cambio que documentan.
 
 ## 1. Identificación
 
 | Persona | Rol | Aportación |
 | --- | --- | --- |
-| Pablo | A · Tests y seguridad | Fase 1: `api/test_api.py` (6 tests del contrato, proveedor simulado) y comprobación de que no se filtran detalles del proveedor; Fase 2: `requirements.txt` con versiones fijadas y tabla de variables completada (§1, §4, §5, §10, §12); _resto pendiente_ |
+| Pablo | A · Tests y seguridad | Fase 1: `api/test_api.py` (6 tests del contrato, proveedor simulado) y comprobación de que no se filtran detalles del proveedor; Fase 2: `requirements.txt` con versiones fijadas y tabla de variables completada; Fase 5: `Dockerfile` multi-stage, `docker_app.py`, `.dockerignore` y verificación local del contenedor (§1, §4, §5, §8, §10, §12); _Fase 3–4 y 6–7 pendientes_ |
 | Javier | B · Frontend y Vercel (integrador) | Scaffold del proyecto, flujo Git y README esqueleto; _resto pendiente_ |
 | Nicolas | C · Backend, infra y AWS | Fase 1: backend FastAPI en `api/index.py` (`GET /api/health`, `POST /api/generar` validado 1–2000, `llamar_ia` aislada con timeout de 20 s y errores 502/504 sin trazas); verificación real en §10, corrección de `AI_MODEL` en §11 e integración de las ramas de Fase 1 en `dev`; _resto pendiente_ |
 
@@ -108,7 +108,34 @@ _Pendiente (Fase 4)._
 
 ## 8. Docker
 
-_Pendiente (Fase 5)._
+Un **único contenedor multi-stage** (`Dockerfile` en la rama `build/a-dockerfile`): la etapa `web` (Node 22 + pnpm) compila la SPA y la etapa final (Python 3.12-slim) instala `requirements.txt` y sirve la API y `dist/` con `uvicorn docker_app:app` en el **puerto 8000**. `docker_app.py` monta `StaticFiles(directory="dist", html=True)` en `/` **después** de las rutas de la API; se llama así (y no `app.py`) para que Vercel no lo tome como entrypoint.
+
+`.dockerignore` excluye del contexto de build: `.git`, `node_modules`, `dist`, `.venv`, `.env`/`.env.*` (menos `.env.example`), `.vercel`, `*.pem`, `evidencias`, `plan`, `__pycache__` y `.pytest_cache`. Ningún secreto entra en la imagen: la única clave que se inyecta es `VITE_CLERK_PUBLISHABLE_KEY` como `ARG` de build (pública) y los secretos se inyectan al **ejecutar** con `--env-file`.
+
+Comprobación local (2026-10-19, imagen `espa-p1:dev` construida desde `dev`):
+
+```bash
+docker build --build-arg VITE_CLERK_PUBLISHABLE_KEY=pk_test_… -t espa-p1:dev .
+docker run -d --name espa -p 8000:8000 espa-p1:dev
+docker ps
+docker logs --tail 50 espa
+curl -s localhost:8000/api/health
+docker stop espa && docker start espa
+docker history espa-p1:dev
+```
+
+| Comando | Resultado |
+| --- | --- |
+| `docker build … -t espa-p1:dev .` | `Successfully tagged espa-p1:dev` (pnpm install --frozen-lockfile + pnpm build, y pip con versiones fijadas) |
+| `docker run -d --name espa -p 8000:8000 espa-p1:dev` | contenedor `Up`, `0.0.0.0:8000->8000/tcp` |
+| `GET http://localhost:8000/api/health` | `200 {"status":"ok"}` |
+| `GET http://localhost:8000/` | HTML de la SPA (`dist/index.html` con sus `/assets/index-*.js`) |
+| `POST http://localhost:8000/api/generar` sin token | `502` (el contenedor no lleva `AI_API_KEY`; el `401` de FastAPI llega con la Fase 4) |
+| `docker logs --tail 8 espa` | arranque de uvicorn, peticiones y `Error del proveedor de IA: OpenAIError` (solo el tipo de excepción, sin claves) |
+| `docker stop espa && docker start espa` | `running` tras el reinicio y `GET /api/health` → `200` |
+| `docker history espa-p1:dev` | sin secretos: la búsqueda de prefijos de claves de API, IDs de AWS y claves privadas no devuelve resultados |
+
+_Pendiente (Fase 4 y 6):_ `.env` real con `AI_API_KEY` y `CLERK_*` para probar login y rechazo `401` dentro del contenedor, `--restart unless-stopped` y mapeo `80:8000` en EC2. El tag formal `v0.5-docker` se crea sobre `main` cuando estén integradas las tres ramas de la Fase 5.
 
 ## 9. AWS
 
@@ -174,6 +201,8 @@ Todos los tests son de contrato: se hace `monkeypatch.setattr("api.index.llamar_
 | 0 | `pnpm create vite .` se cancela en un repo con archivos | Vite pide directorio vacío | Generar el scaffold en una carpeta temporal y copiarlo sin pisar `.gitignore` ni `README.md` | `pnpm build` y `pnpm install --frozen-lockfile` en limpio |
 | 0 | `@clerk/clerk-react` aparece como deprecado | Clerk lo renombró a `@clerk/react` en Core 3 | Usar `@clerk/react` | `pnpm view @clerk/clerk-react deprecated` |
 | 1 | `POST /api/generar` devuelve `502` y el log muestra `NotFoundError` | El modelo de `AI_MODEL` no existe en OpenRouter (`No endpoints found for <modelo>`) | Cambiar `AI_MODEL` a un modelo válido y disponible (`nvidia/nemotron-3.5-lightning:free`) | `POST /api/generar` con texto válido devuelve `200` y resumen real |
+| 5 | `docker version` → `permission denied while trying to connect to the docker API` | El usuario no pertenecía al grupo `docker` (el daemon estaba instalado y parado) | `sudo systemctl start docker` y `sudo usermod -aG docker $USER` + abrir una sesión nueva | `docker version --format '{{.Server.Version}}'` → `29.9.0` |
+| 5 | `docker build` falla en `pnpm install --frozen-lockfile` con `getaddrinfo EAI_AGAIN registry.npmjs.org` | Fallo transitorio de DNS dentro de la build (el host y el contenedor resuelven bien al repetirlo) | Repetir el `docker build`; las capas ya descartadas se recuperan del cache | `docker build` termina con `Successfully tagged espa-p1:dev` |
 
 ## 12. Git y evidencias
 
@@ -193,5 +222,6 @@ Todos los tests son de contrato: se hace `monkeypatch.setattr("api.index.llamar_
 | Fase 1 | `docs/c-fase1-backend` | Verificación con el modelo real y arreglo de `AI_MODEL` (§10 y §11) (Nicolas) |
 | Fase 1 | `test/a-backend-tests` | `api/test_api.py` (6 tests de contrato) y documentación en §1, §4, §10 y §12 (Pablo) |
 | Fase 2 | `chore/a-reproducible-deps` | `requirements.txt` con versiones fijadas y tabla de variables de entorno completada (§4 y §5) (Pablo) |
+| Fase 5 | `build/a-dockerfile` | `Dockerfile` multi-stage, `docker_app.py` y `.dockerignore` + verificación local del contenedor (§8) (Pablo) |
 
 _Tags, releases y capturas: pendientes._
