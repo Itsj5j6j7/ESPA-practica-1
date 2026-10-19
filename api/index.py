@@ -1,9 +1,12 @@
+import logging
 import os
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
-from openai import OpenAI
+from openai import APITimeoutError, OpenAI, OpenAIError
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger("espa")
 
 load_dotenv()
 
@@ -54,4 +57,17 @@ def health() -> dict:
 
 @app.post("/api/generar", response_model=GenerarResponse)
 def generar(payload: GenerarRequest) -> GenerarResponse:
-    return GenerarResponse(resumen=llamar_ia(payload.texto))
+    try:
+        resumen = llamar_ia(payload.texto)
+    except APITimeoutError:
+        logger.warning("Timeout llamando al proveedor de IA")
+        raise HTTPException(
+            status_code=504, detail="El servicio de IA tardó demasiado"
+        )
+    except (OpenAIError, ValueError) as exc:
+        # No logueamos str(exc): puede contener la clave o el cuerpo del proveedor.
+        logger.warning("Error del proveedor de IA: %s", type(exc).__name__)
+        raise HTTPException(
+            status_code=502, detail="El servicio de IA no está disponible"
+        )
+    return GenerarResponse(resumen=resumen)
