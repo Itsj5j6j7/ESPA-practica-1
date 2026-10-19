@@ -118,7 +118,27 @@ vercel deploy               # Preview
 vercel deploy --prod        # producción
 ```
 
-_Pendiente: URL de producción, salida de los comandos y capturas (Fase 3)._
+Despliegue (2026-10-19, proyecto `espa-practica-1`, repo conectado a GitHub): **https://espa-practica-1.vercel.app**
+
+| Comando | Finalidad | Resultado |
+| --- | --- | --- |
+| `vercel link` | Crear el proyecto y enlazar la carpeta | Proyecto creado; deja `.vercel/` y `.env.local` (ambos ignorados). Detecta Vite y respeta `vercel.json` |
+| `vercel deploy` | Despliegue de prueba | `Ready` en ~1 min. Es el primero del proyecto, así que Vercel lo asigna a producción |
+| `vercel deploy --prod` | Publicar en producción | `Ready` en ~54 s; el alias `espa-practica-1.vercel.app` apunta al nuevo despliegue |
+| `vercel logs --since 30m` | Ver logs de la función | Dos peticiones `POST /api/generar` con `HTTP/1.1 200 OK` desde OpenRouter, `runtime: python3.12` |
+
+Verificación contra el alias de producción:
+
+| Petición | Resultado |
+| --- | --- |
+| `GET /` | `200`, HTML de la SPA con `/assets/index-*.js` |
+| `GET /api/health` | `200 {"status":"ok"}` |
+| `POST /api/generar` con texto válido | `200 {"resumen":"…"}` (resumen real, ~38 s la primera vez con el modelo gratuito) |
+| `POST /api/generar` con `texto` vacío | `422` |
+
+**Deployment Protection:** está activa (Vercel Authentication) para las URLs propias de cada despliegue (`espa-practica-1-<hash>-<equipo>.vercel.app` responde `302` al login de Vercel), pero **no** para el alias de producción, que es público. Las comprobaciones con `curl` y las evidencias de rechazo se hacen siempre contra el alias.
+
+_Pendiente: capturas del proyecto y de las variables en Vercel (sin valores)._
 
 ## 7. Clerk
 
@@ -235,6 +255,8 @@ Comprobaciones ejecutadas (2026-10-19, backend con `uvicorn` en `:8000` y `pnpm 
 | 1 | `POST /api/generar` devuelve `502` y el log muestra `NotFoundError` | El modelo de `AI_MODEL` no existe en OpenRouter (`No endpoints found for <modelo>`) | Cambiar `AI_MODEL` a un modelo válido y disponible (`nvidia/nemotron-3.5-lightning:free`) | `POST /api/generar` con texto válido devuelve `200` y resumen real |
 | 2 | `pnpm build` falla con `exec: node: no encontrado` aunque `pnpm` funciona | `pnpm` se instaló como binario independiente y no trae Node; `tsc` y `vite` lo necesitan | Instalar Node (el 24 LTS vale; en Arch `sudo pacman -S nodejs`) | `node -v` y `pnpm build` terminan bien |
 | 2 | `POST /api/generar` da `502` con el log `NotFoundError` en un `.env` heredado | El `AI_MODEL` local apuntaba a un modelo que ya no existe en OpenRouter (mismo síntoma que en Fase 1) | Cambiar `AI_MODEL` en `.env` y reiniciar `uvicorn`: `load_dotenv()` solo lee el archivo al arrancar | `POST /api/generar` devuelve `200` con resumen |
+| 3 | `vercel link` termina con `Failed to connect Itsj5j6j7/ESPA-practica-1 to project` | La app de GitHub de Vercel no tenía acceso al repositorio | En GitHub → Settings → Applications → Vercel → Configure, dar acceso al repo y conectarlo en Project → Settings → Git | El proyecto muestra el repo conectado; `vercel deploy` no depende de esta conexión |
+| 3 | `vercel link` añade `.vercel` y `.env*` al `.gitignore` | La CLI lo hace sin mirar las reglas existentes; `.env*` volvería a ignorar `.env.example` | Descartar el cambio: `.vercel/` y `.env.*` (con `!.env.example`) ya estaban | `git check-ignore -v .env.local .vercel/project.json` los cubre y `.env.example` sigue versionado |
 | 5 | `docker version` → `permission denied while trying to connect to the docker API` | El usuario no pertenecía al grupo `docker` (el daemon estaba instalado y parado) | `sudo systemctl start docker` y `sudo usermod -aG docker $USER` + abrir una sesión nueva | `docker version --format '{{.Server.Version}}'` → `29.9.0` |
 | 5 | `docker build` falla en `pnpm install --frozen-lockfile` con `getaddrinfo EAI_AGAIN registry.npmjs.org` | Fallo transitorio de DNS dentro de la build (el host y el contenedor resuelven bien al repetirlo) | Repetir el `docker build`; las capas ya descartadas se recuperan del cache | `docker build` termina con `Successfully tagged espa-p1:dev` |
 
@@ -258,6 +280,7 @@ Comprobaciones ejecutadas (2026-10-19, backend con `uvicorn` en `:8000` y `pnpm 
 | Fase 2 | `chore/a-reproducible-deps` | `requirements.txt` con versiones fijadas y tabla de variables de entorno completada (§4 y §5) (Pablo) |
 | Fase 2 | `feat/b-spa` | `src/App.tsx` (formulario, carga y error) y proxy `/api` en `vite.config.ts` + documentación en §1, §4, §10 y §11 (Javier) |
 | Fase 3 | `build/b-vercel-config` | `vercel.json` (Vite + rewrite `/api/*`), `.vercelignore` y documentación en §6 (Javier) |
+| Fase 3 | `docs/b-vercel-deploy` | `vercel link/deploy/deploy --prod` ejecutados y verificación de producción en §6 y §11 (Javier) |
 | Fase 5 | `build/a-dockerfile` | `Dockerfile` multi-stage, `docker_app.py` y `.dockerignore` + verificación local del contenedor (§8) (Pablo) |
 
 _Tags, releases y capturas: pendientes._
