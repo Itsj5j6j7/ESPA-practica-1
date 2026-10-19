@@ -1,0 +1,20 @@
+# dependencias
+node_modules/
+.venv/
+__pycache__/
+.pytest_cache/
+
+# build
+dist/
+.vercel/
+
+# secretos
+.env
+.env.*
+!.env.example
+
+# editor / sistema
+.vscode/
+.idea/
+.DS_Store
+*.log
