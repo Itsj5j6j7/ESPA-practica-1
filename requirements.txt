@@ -1,7 +1,11 @@
-fastapi
-uvicorn[standard]
-openai
-clerk-backend-api
-python-dotenv
-pytest
-httpx
+# Dependencias directas con la versión fijada (Fase 2 · Persona A) para que
+# el despliegue sea reproducible en local, Vercel y el contenedor.
+# Refrescar una versión: pip install -U <paquete> y actualizar la línea aquí.
+# Python local 3.14 · Python de la imagen 3.12 (ver README §4).
+fastapi==0.146.0
+uvicorn[standard]==0.54.0
+openai==3.35.1
+clerk-backend-api==7.0.0
+python-dotenv==1.2.4
+pytest==9.1.1
+httpx==0.28.1

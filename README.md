@@ -8,7 +8,7 @@ Miniapp que resume un texto con IA. Se despliega de dos formas: serverless en Ve
 
 | Persona | Rol | Aportación |
 | --- | --- | --- |
-| Pablo | A · Tests y seguridad | Fase 1: `api/test_api.py` (6 tests del contrato, proveedor simulado) y comprobación de que no se filtran detalles del proveedor; §4 y §10 (tests); _resto pendiente_ |
+| Pablo | A · Tests y seguridad | Fase 1: `api/test_api.py` (6 tests del contrato, proveedor simulado) y comprobación de que no se filtran detalles del proveedor; Fase 2: `requirements.txt` con versiones fijadas y tabla de variables completada (§1, §4, §5, §10, §12); _resto pendiente_ |
 | Javier | B · Frontend y Vercel (integrador) | Scaffold del proyecto, flujo Git y README esqueleto; _resto pendiente_ |
 | Nicolas | C · Backend, infra y AWS | Fase 1: backend FastAPI en `api/index.py` (`GET /api/health`, `POST /api/generar` validado 1–2000, `llamar_ia` aislada con timeout de 20 s y errores 502/504 sin trazas); verificación real en §10, corrección de `AI_MODEL` en §11 e integración de las ramas de Fase 1 en `dev`; _resto pendiente_ |
 
@@ -51,6 +51,9 @@ Versiones con las que se ha creado el proyecto:
 | Vite / React / TypeScript | 8.3 / 19.2 / 6.0 |
 | Tailwind CSS | 4.3 (plugin `@tailwindcss/vite`) |
 | Clerk (frontend) | `@clerk/react` 6.17 |
+| pytest · httpx | 9.1.1 · 0.28.1 (tests del contrato de la API) |
+
+Las dependencias de Python están **fijadas con `==` en `requirements.txt`** (Fase 2) para que el mismo código instale lo mismo en local, en Vercel y en la imagen de Docker. Para actualizar una versión: `pip install -U <paquete>`, comprobar `pytest -q` y cambiar la línea correspondiente.
 
 Frontend:
 
@@ -82,15 +85,18 @@ _Comprobación de extremo a extremo: pendiente (Fase 2)._
 
 ## 5. Variables de entorno
 
-| Variable | Finalidad | Pública/Secreta | Dónde se configura | Momento de uso |
-| --- | --- | --- | --- | --- |
-| `AI_API_KEY` | Clave de OpenRouter | Secreta | `.env` local · Vercel env · archivo privado en EC2 | Ejecución |
-| `AI_MODEL` | Modelo de OpenRouter (formato `proveedor/modelo`) | No secreta | igual | Ejecución |
-| `CLERK_SECRET_KEY` | Validar sesiones en el backend | Secreta | igual | Ejecución |
-| `CLERK_AUTHORIZED_PARTIES` | Orígenes permitidos, separados por coma | No secreta | igual | Ejecución |
-| `VITE_CLERK_PUBLISHABLE_KEY` | Inicializar Clerk en la SPA | Pública | `.env` local · Vercel env · `--build-arg` en Docker | **Compilación** |
+| Variable | Finalidad | Pública/Secreta | Dónde se configura | Momento de uso | Fase |
+| --- | --- | --- | --- | --- | --- |
+| `AI_API_KEY` | Clave de OpenRouter | Secreta | `.env` local · Vercel env · archivo privado en EC2 | **Ejecución** (arranque del proceso) | 1 |
+| `AI_MODEL` | Modelo de OpenRouter (formato `proveedor/modelo`) | No secreta | igual | **Ejecución** | 1 |
+| `CLERK_SECRET_KEY` | Validar sesiones en el backend | Secreta | igual | **Ejecución** | 4 |
+| `CLERK_AUTHORIZED_PARTIES` | Orígenes permitidos, separados por coma | No secreta | igual | **Ejecución** | 4 |
+| `VITE_CLERK_PUBLISHABLE_KEY` | Inicializar Clerk en la SPA | Pública | `.env` local · Vercel env · `--build-arg` en Docker | **Compilación** (se incrusta en el bundle JS) | 4 |
 
-El proveedor de IA es OpenRouter, que expone una API compatible con OpenAI (`https://openrouter.ai/api/v1`); el modelo va en variable, no en código. `.env.example` solo contiene nombres, nunca valores.
+- El proveedor de IA es OpenRouter, que expone una API compatible con OpenAI (`https://openrouter.ai/api/v1`); el modelo va en variable, no en código. `.env.example` solo contiene nombres, nunca valores.
+- **Quién lee cada variable:** el backend las toma con `os.getenv()` (cargadas localmente con `python-dotenv`); la SPA solo puede ver las `VITE_*`, que Vite sustituye durante `pnpm build`.
+- **Cuándo hace efecto un cambio:** las de *ejecución* solo se leen al arrancar, así que cambiarlas en Vercel o en EC2 **no** afecta a despliegues ya hechos: hay que redesplegar o reiniciar el contenedor. La de *compilación* hay que volver a compilar (`vercel deploy --prod` o `docker build` de nuevo).
+- **Para configurarlas sin filtrarlas:** en Vercel, `vercel env add <nombre> <entorno>` pide el valor por teclado (no queda en el historial); `vercel env ls` lista nombres y entornos, no valores. En EC2 van en `~/espa.env` con permisos `600`, fuera del repositorio.
 
 ## 6. Vercel
 
@@ -186,5 +192,6 @@ Todos los tests son de contrato: se hace `monkeypatch.setattr("api.index.llamar_
 | Fase 1 | `feat/c-generar-endpoint` | `api/index.py`: `health`, `generar`, validación y errores 502/504 (Nicolas) |
 | Fase 1 | `docs/c-fase1-backend` | Verificación con el modelo real y arreglo de `AI_MODEL` (§10 y §11) (Nicolas) |
 | Fase 1 | `test/a-backend-tests` | `api/test_api.py` (6 tests de contrato) y documentación en §1, §4, §10 y §12 (Pablo) |
+| Fase 2 | `chore/a-reproducible-deps` | `requirements.txt` con versiones fijadas y tabla de variables de entorno completada (§4 y §5) (Pablo) |
 
 _Tags, releases y capturas: pendientes._
