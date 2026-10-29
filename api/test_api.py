@@ -70,3 +70,43 @@ def test_generar_returns_504_on_provider_timeout(monkeypatch):
 
     assert response.status_code == 504
     assert response.json() == {"detail": "El servicio de IA tardó demasiado"}
+
+
+def test_tarot_happy_path_with_mocked_provider(monkeypatch):
+    def proveedor_falso(fecha, hora, signo, cartas):
+        assert signo == "Escorpio"
+        assert len(cartas) == 3
+        return "Lectura de prueba."
+
+    monkeypatch.setattr("api.index.llamar_ia_tarot", proveedor_falso)
+
+    response = client.post("/api/tarot", json={"fecha": "2000-11-05", "hora": "14:30"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["signo"] == "Escorpio"
+    assert body["lectura"] == "Lectura de prueba."
+    assert [c["posicion"] for c in body["cartas"]] == ["Pasado", "Presente", "Futuro"]
+    assert len({c["indice"] for c in body["cartas"]}) == 3
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [{}, {"fecha": "no-es-fecha"}, {"fecha": "1800-01-01"}, {"fecha": "2999-01-01"}],
+    ids=["sin-fecha", "formato-invalido", "anterior-a-1900", "futura"],
+)
+def test_tarot_rejects_invalid_input(payload):
+    response = client.post("/api/tarot", json=payload)
+    assert response.status_code == 422
+
+
+def test_tarot_returns_generic_502_on_provider_failure(monkeypatch):
+    def proveedor_fallo(*args):
+        raise OpenAIError("CLAVE_SECRETA detalle interno del proveedor")
+
+    monkeypatch.setattr("api.index.llamar_ia_tarot", proveedor_fallo)
+
+    response = client.post("/api/tarot", json={"fecha": "2000-11-05"})
+
+    assert response.status_code == 502
+    assert "CLAVE_SECRETA" not in response.text

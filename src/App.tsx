@@ -1,35 +1,55 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import Balatro from './components/Balatro'
+import HoloCard from './components/HoloCard'
+import ShinyText from './components/ShinyText'
+import VariableProximity from './components/VariableProximity'
 
-const MAX_CHARS = 2000
+interface Carta {
+  indice: number
+  nombre: string
+  posicion: string
+}
+
+interface Tirada {
+  signo: string
+  cartas: Carta[]
+  lectura: string
+}
+
+const hoy = new Date().toISOString().slice(0, 10)
+
+const campo =
+  'w-full rounded-xl border border-violet-400/30 bg-black/40 px-4 py-3 text-violet-50 outline-none transition focus:border-violet-300 focus:ring-2 focus:ring-violet-400/40'
 
 export default function App() {
-  const [texto, setTexto] = useState('')
-  const [resumen, setResumen] = useState('')
+  const [fecha, setFecha] = useState('')
+  const [hora, setHora] = useState('')
+  const [tirada, setTirada] = useState<Tirada | null>(null)
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState('')
+  const intro = useRef<HTMLDivElement>(null)
 
-  async function resumir(e: React.FormEvent) {
+  async function tirarCartas(e: React.FormEvent) {
     e.preventDefault()
     setCargando(true)
     setError('')
-    setResumen('')
+    setTirada(null)
     try {
-      const res = await fetch('/api/generar', {
+      const res = await fetch('/api/tarot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ texto }),
+        body: JSON.stringify({ fecha, hora: hora || null }),
       })
       const data = await res.json()
       if (!res.ok) {
-        // 422 trae `detail` como lista de errores de validación; 502/504 como texto
         setError(
           typeof data.detail === 'string'
             ? data.detail
-            : 'El texto no es válido: debe tener entre 1 y 2000 caracteres',
+            : 'La fecha no es válida',
         )
         return
       }
-      setResumen(data.resumen)
+      setTirada(data)
     } catch {
       setError('No se pudo conectar con el servidor')
     } finally {
@@ -38,44 +58,130 @@ export default function App() {
   }
 
   return (
-    <main className="mx-auto max-w-xl p-6">
-      <h1 className="text-2xl font-bold">Resumidor</h1>
-      <form onSubmit={resumir} className="mt-4 space-y-3">
-        <textarea
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          maxLength={MAX_CHARS}
-          rows={8}
-          placeholder="Pega aquí el texto que quieres resumir"
-          className="w-full rounded border border-gray-300 p-2"
+    <>
+      <div className="fixed inset-0 -z-10">
+        <Balatro
+          color1="#7c3aed"
+          color2="#2e1065"
+          color3="#05020a"
+          contrast={3}
+          lighting={0.35}
+          swirl={0.3}
+          speed={0.6}
+          pixelSize={2}
         />
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-500">
-            {texto.length}/{MAX_CHARS}
-          </span>
+      </div>
+
+      <main className="mx-auto flex min-h-screen max-w-5xl flex-col items-center px-4 py-14">
+        <div ref={intro} className="text-center">
+          <h1 className="font-display text-4xl font-bold sm:text-6xl">
+            <ShinyText
+              text="Oráculo Astral"
+              color="#c4b5fd"
+              shineColor="#ffffff"
+              speed={3}
+            />
+          </h1>
+          <div className="mx-auto mt-5 max-w-xl text-lg text-violet-200/80">
+            <VariableProximity
+              label="Dime cuándo naciste y las estrellas moverán las cartas para ti."
+              containerRef={intro}
+              radius={110}
+              fromFontVariationSettings="'wght' 300, 'opsz' 14"
+              toFontVariationSettings="'wght' 900, 'opsz' 40"
+              toColor="#ffffff"
+            />
+          </div>
+        </div>
+
+        <form
+          onSubmit={tirarCartas}
+          className="mt-10 w-full max-w-md space-y-4 rounded-3xl border border-violet-400/20 bg-black/50 p-6 shadow-[0_0_60px_-15px_#7c3aed] backdrop-blur-md"
+        >
+          <label className="block text-sm text-violet-200/80">
+            Fecha de nacimiento
+            <input
+              type="date"
+              required
+              min="1900-01-01"
+              max={hoy}
+              value={fecha}
+              onChange={(e) => setFecha(e.target.value)}
+              className={`${campo} mt-1`}
+            />
+          </label>
+          <label className="block text-sm text-violet-200/80">
+            Hora de nacimiento <span className="text-violet-300/50">(opcional)</span>
+            <input
+              type="time"
+              value={hora}
+              onChange={(e) => setHora(e.target.value)}
+              className={`${campo} mt-1`}
+            />
+          </label>
           <button
             type="submit"
-            disabled={cargando || !texto.trim()}
-            className="rounded bg-indigo-600 px-4 py-2 text-white disabled:opacity-50"
+            disabled={cargando || !fecha}
+            className="w-full cursor-pointer rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-3 font-display font-bold tracking-wide text-white shadow-lg shadow-violet-900/50 transition hover:brightness-125 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {cargando ? 'Resumiendo…' : 'Resumir'}
+            {cargando ? (
+              <ShinyText text="Barajando el destino…" color="#e9d5ff" shineColor="#ffffff" />
+            ) : (
+              'Tirar las cartas'
+            )}
           </button>
-        </div>
-      </form>
-      {error && (
-        <p
-          role="alert"
-          className="mt-6 rounded border border-red-300 bg-red-50 p-3 text-red-800"
-        >
-          {error}
-        </p>
-      )}
-      {resumen && (
-        <section className="mt-6 rounded border border-gray-200 bg-gray-50 p-4">
-          <h2 className="font-semibold">Resumen</h2>
-          <p className="mt-2 whitespace-pre-wrap">{resumen}</p>
-        </section>
-      )}
-    </main>
+        </form>
+
+        {error && (
+          <p
+            role="alert"
+            className="mt-6 max-w-md rounded-xl border border-rose-400/40 bg-rose-950/60 p-3 text-rose-200 backdrop-blur"
+          >
+            {error}
+          </p>
+        )}
+
+        {tirada && (
+          <section className="mt-14 w-full">
+            <p className="aparecer text-center font-display text-lg text-violet-200">
+              Signo: <span className="font-bold text-white">{tirada.signo}</span>
+            </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-8">
+              {tirada.cartas.map((c, i) => (
+                <figure
+                  key={c.indice}
+                  className="aparecer text-center"
+                  style={{ animationDelay: `${0.3 + i * 0.35}s` }}
+                >
+                  <HoloCard
+                    image={`/tarot/${String(c.indice).padStart(2, '0')}.jpg`}
+                    alt={c.nombre}
+                    preset="cosmos"
+                    width={220}
+                  />
+                  <figcaption className="mt-4 font-display">
+                    <span className="block text-xs uppercase tracking-[0.3em] text-violet-300/70">
+                      {c.posicion}
+                    </span>
+                    <span className="text-lg font-bold text-white">{c.nombre}</span>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+            <article
+              className="aparecer mx-auto mt-12 max-w-2xl space-y-4 rounded-3xl border border-violet-400/20 bg-black/50 p-6 leading-relaxed text-violet-100 backdrop-blur-md sm:p-8"
+              style={{ animationDelay: '1.5s' }}
+            >
+              {tirada.lectura.split(/\n\s*\n/).map((parrafo, i) => (
+                <p key={i}>{parrafo}</p>
+              ))}
+              <p className="pt-2 text-xs text-violet-300/50">
+                Solo con fines de entretenimiento. Cartas Rider-Waite (1909), dominio público.
+              </p>
+            </article>
+          </section>
+        )}
+      </main>
+    </>
   )
 }
