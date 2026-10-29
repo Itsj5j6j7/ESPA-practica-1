@@ -198,7 +198,7 @@ export default function App() {
                   <HoloCard
                     image={`/tarot/${String(c.indice).padStart(2, '0')}.jpg`}
                     alt={c.nombre}
-                    preset="cosmos"
+                    preset="rainbow"
                     width={220}
                   />
                   <figcaption className="mt-4 font-display">
