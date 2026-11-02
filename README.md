@@ -2,7 +2,7 @@
 
 Miniapp que resume un texto con IA. Se despliega de dos formas: serverless en Vercel (Parte 1) y en un contenedor Docker sobre AWS EC2 (Parte 2), con autenticación Clerk en ambas.
 
-> Estado: **Fases 0, 1 y 2 integradas en `dev`** (SPA y proxy de Javier) (backend y verificación de Nicolas; tests, dependencias fijadas y variables de Pablo) y **Fase 5 hecha por Pablo** (`Dockerfile` multi-stage + verificación local del contenedor). Pendientes: Vercel (Fase 3, Javier), Clerk (Fase 4) y EC2 (Fase 6). Las secciones marcadas _Pendiente_ se rellenan en la fase indicada, en la misma rama que el cambio que documentan.
+> Estado: **Fases 0, 1 y 2 integradas en `dev`** (SPA y proxy de Javier) (backend y verificación de Nicolas; tests, dependencias fijadas y variables de Pablo) y **Fase 5 hecha** (`Dockerfile` multi-stage de Pablo + verificación local con Clerk y procedimiento de subida a EC2 de Nicolas). Pendientes: Vercel (Fase 3, Javier), Clerk (Fase 4) y EC2 (Fase 6). Las secciones marcadas _Pendiente_ se rellenan en la fase indicada, en la misma rama que el cambio que documentan.
 
 ## 1. Identificación
 
@@ -10,7 +10,7 @@ Miniapp que resume un texto con IA. Se despliega de dos formas: serverless en Ve
 | --- | --- | --- |
 | Pablo | A · Tests y seguridad | Fase 1: `api/test_api.py` (6 tests del contrato, proveedor simulado) y comprobación de que no se filtran detalles del proveedor; Fase 2: `requirements.txt` con versiones fijadas y tabla de variables completada; Fase 5: `Dockerfile` multi-stage, `docker_app.py`, `.dockerignore` y verificación local del contenedor (§1, §4, §5, §8, §10, §12); _Fase 3–4 y 6–7 pendientes_ |
 | Javier | B · Frontend y Vercel (integrador) | Fase 0: scaffold del proyecto, flujo Git y README esqueleto; Fase 2: SPA React (`src/App.tsx`: formulario, carga, error y resultado) y proxy de Vite (§4, §10, §11, §12); integración de las ramas en `dev`; _Fase 3–4 y 6–7 pendientes_ |
-| Nicolas | C · Backend, infra y AWS | Fase 1: backend FastAPI en `api/index.py` (`GET /api/health`, `POST /api/generar` validado 1–2000, `llamar_ia` aislada con timeout de 20 s y errores 502/504 sin trazas); verificación real en §10, corrección de `AI_MODEL` en §11 e integración de las ramas de Fase 1 en `dev`; _resto pendiente_ |
+| Nicolas | C · Backend, infra y AWS | Fase 1: backend FastAPI en `api/index.py` (`GET /api/health`, `POST /api/generar` validado 1–2000, `llamar_ia` aislada con timeout de 20 s y errores 502/504 sin trazas); verificación real en §10, corrección de `AI_MODEL` en §11 e integración de las ramas de Fase 1 en `dev`; Fase 5: verificación del contenedor con Clerk (rechazo `401`, logs, parada/arranque, `--restart unless-stopped`), procedencia de la imagen y procedimiento de actualización (§8, §11, §12); _resto pendiente_ |
 
 - Práctica: UD1 · Explotación y despliegue de una aplicación con IA.
 - Miniapp: **Resumidor** (texto de 1 a 2000 caracteres → resumen breve).
@@ -175,7 +175,71 @@ docker history espa-p1:dev
 | `docker stop espa && docker start espa` | `running` tras el reinicio y `GET /api/health` → `200` |
 | `docker history espa-p1:dev` | sin secretos: la búsqueda de prefijos de claves de API, IDs de AWS y claves privadas no devuelve resultados |
 
-_Pendiente (Fase 4 y 6):_ `.env` real con `AI_API_KEY` y `CLERK_*` para probar login y rechazo `401` dentro del contenedor, `--restart unless-stopped` y mapeo `80:8000` en EC2. El tag formal `v0.5-docker` se crea sobre `main` cuando estén integradas las tres ramas de la Fase 5.
+### Verificación con autenticación (2026-11-02, rama `docs/c-docker-verification`)
+
+La imagen se reconstruye con la clave publicable real y el contenedor se arranca con el `.env` completo. `CLERK_AUTHORIZED_PARTIES` debe incluir el origen desde el que se abre la SPA (`http://localhost:8000`), que no está en el `.env` de desarrollo (`:5173`); se añade con `-e`, que prevalece sobre `--env-file`:
+
+```bash
+set -a && . ./.env && set +a
+docker build --build-arg VITE_CLERK_PUBLISHABLE_KEY="$VITE_CLERK_PUBLISHABLE_KEY" -t espa-p1:dev -t espa-p1:$(git rev-parse --short HEAD) .
+docker run -d --name espa --restart unless-stopped -p 8000:8000 \
+  --env-file .env -e CLERK_AUTHORIZED_PARTIES="$CLERK_AUTHORIZED_PARTIES,http://localhost:8000" \
+  espa-p1:dev
+```
+
+| Comprobación | Resultado |
+| --- | --- |
+| `docker ps` | un solo contenedor `espa` (`espa-p1:dev`), `Up`, `0.0.0.0:8000->8000/tcp` |
+| `GET /api/health` | `200 {"status":"ok"}` (público) |
+| `GET /` en navegador headless (Chromium) | la SPA renderiza («Iniciar sesión» / «Registrarse»), sin errores de consola |
+| `POST /api/generar` y `/api/tarot` **sin** `Authorization` | `401 {"detail":"No autenticado"}` (lo devuelve FastAPI, no Vercel) |
+| `POST /api/generar` con `Authorization: Bearer abc.def.ghi` | `401 {"detail":"No autenticado"}` (firma inválida) |
+| Inicio de sesión en `http://localhost:8000` con una cuenta de prueba de Clerk y una lectura de tarot | `docker logs espa` muestra `POST /api/tarot … 200 OK`: el token de sesión llega a FastAPI y se valida dentro del contenedor |
+| `docker stop espa` y `docker start espa` | `exited` → `running`; con el contenedor parado el puerto no responde (`000`) y tras `start` `GET /api/health` → `200` |
+| `docker inspect -f '{{.HostConfig.RestartPolicy.Name}}' espa` y `docker restart espa` | `unless-stopped`; tras el reinicio `GET /api/health` → `200` |
+| `docker logs --tail 12 espa` | arranque de uvicorn y una línea por petición (`200`, `401`); nunca el cuerpo, el token ni las claves |
+| `docker history --no-trunc espa-p1:dev` + búsqueda de `sk-`, `sk_test_`/`sk_live_`, `BEGIN … PRIVATE KEY` y `AKIA` | 0 coincidencias |
+| `grep -rlF "$AI_API_KEY"` sobre el sistema de ficheros de la imagen | 0 ficheros; tampoco hay ningún `.env*` dentro de la imagen |
+
+El `ENV` de la imagen final solo contiene variables de la imagen base de Python; la clave publicable (pública por diseño) solo queda en el bundle de `dist/`. El aviso de `docker build` `SecretsUsedInArgOrEnv` sobre `VITE_CLERK_PUBLISHABLE_KEY` es un falso positivo por el nombre: es la clave publicable `pk_test_…`, que acaba en el JS que descarga cualquier navegador, y la etapa `web` no forma parte de la imagen final.
+
+### Procedencia de la imagen y actualización
+
+**Qué versión es cada imagen.** Cada imagen se etiqueta con el hash corto del commit con el que se construyó (`espa-p1:f494c36`) y, al cerrar el hito, con el tag de Git (`espa-p1:v0.5-docker`, y `espa-p1:v1.0-aws` para la versión desplegada en EC2). Como el repositorio no guarda imágenes, el vínculo es el nombre de la etiqueta: `docker ps --format '{{.Image}}'` dice qué versión corre y `git show <tag>` o `git show <sha>` qué código contiene. La imagen se construye siempre desde un checkout limpio de ese commit (la etapa `web` copia el árbol de trabajo entero, salvo lo excluido en `.dockerignore`).
+
+**Cómo llega la imagen a EC2.** Se construye en local (la máquina de desarrollo y una EC2 `t3.*` son ambas `linux/amd64`, así que la imagen sirve tal cual) y se traslada como archivo, sin registro de imágenes. Los secretos viajan aparte, en un `.env.ec2` propio (ignorado por Git y por `.dockerignore`) con `CLERK_AUTHORIZED_PARTIES` apuntando a `http://IP_EC2`:
+
+```bash
+# En local
+docker save espa-p1:<sha> | gzip > espa-p1-<sha>.tar.gz
+scp -i <clave.pem> espa-p1-<sha>.tar.gz .env.ec2 ubuntu@IP_EC2:~
+
+# En EC2
+mv .env.ec2 .env && chmod 600 .env
+gunzip -c espa-p1-<sha>.tar.gz | docker load
+docker run -d --name espa --restart unless-stopped -p 80:8000 --env-file .env espa-p1:<sha>
+curl -s localhost/api/health && docker logs --tail 20 espa
+```
+
+Alternativa si la instancia tiene memoria de sobra: `git clone` + `git checkout <tag>` + `docker build` directamente en EC2.
+
+**Actualizar a una versión nueva** (también cuando solo cambian variables de entorno):
+
+```bash
+git fetch --tags && git checkout <tag>
+docker build --build-arg VITE_CLERK_PUBLISHABLE_KEY=<pk_test_…> -t espa-p1:<tag> .
+# subir a EC2 como arriba y, allí:
+docker stop espa && docker rm espa
+docker run -d --name espa --restart unless-stopped -p 80:8000 --env-file .env espa-p1:<tag>
+curl -s localhost/api/health && docker logs --tail 20 espa
+```
+
+- `docker restart` **no** relee `--env-file`: las variables se fijan al crear el contenedor, así que un cambio en `.env` exige `stop` + `rm` + `run`.
+- Cambiar la clave publicable de Clerk obliga a reconstruir la imagen (es de compilación, §5).
+- **Vuelta atrás:** volver a crear el contenedor con la etiqueta anterior (`espa-p1:<tag_anterior>`); las imágenes antiguas siguen en el host hasta que se borren con `docker image rm`.
+- La secuencia de parar, recrear y comprobar se ha ejecutado en local (con `-p 8000:8000`); su validación en EC2, con `-p 80:8000`, queda para la Fase 6.
+
+_Pendiente (Fase 6):_ ejecutar el contenedor en EC2 (mapeo `80:8000`, `CLERK_AUTHORIZED_PARTIES` con `http://IP_EC2`). El tag formal `v0.5-docker` se crea sobre `main` cuando estén integradas las tres ramas de la Fase 5.
 
 ## 9. AWS
 
@@ -260,13 +324,14 @@ Comprobaciones ejecutadas (2026-10-19, backend con `uvicorn` en `:8000` y `pnpm 
 | 3 | `vercel link` termina con `Failed to connect Itsj5j6j7/ESPA-practica-1 to project` | La app de GitHub de Vercel no tenía acceso al repositorio | En GitHub → Settings → Applications → Vercel → Configure, dar acceso al repo y conectarlo en Project → Settings → Git | El proyecto muestra el repo conectado; `vercel deploy` no depende de esta conexión |
 | 3 | `vercel link` añade `.vercel` y `.env*` al `.gitignore` | La CLI lo hace sin mirar las reglas existentes; `.env*` volvería a ignorar `.env.example` | Descartar el cambio: `.vercel/` y `.env.*` (con `!.env.example`) ya estaban | `git check-ignore -v .env.local .vercel/project.json` los cubre y `.env.example` sigue versionado |
 | 5 | `docker version` → `permission denied while trying to connect to the docker API` | El usuario no pertenecía al grupo `docker` (el daemon estaba instalado y parado) | `sudo systemctl start docker` y `sudo usermod -aG docker $USER` + abrir una sesión nueva | `docker version --format '{{.Server.Version}}'` → `29.9.0` |
+| 5 | La SPA servida por el contenedor sale en blanco y la consola dice `Falta VITE_CLERK_PUBLISHABLE_KEY` | La imagen se construyó con la variable vacía (`.env` sin rellenar): Vite incrusta `VITE_*` en el bundle **al compilar**, así que pasarla luego con `--env-file` no sirve | Rellenar la clave en `.env` y volver a ejecutar `docker build --build-arg VITE_CLERK_PUBLISHABLE_KEY="$VITE_CLERK_PUBLISHABLE_KEY" …`; recrear el contenedor | La SPA muestra «Iniciar sesión» / «Registrarse» y la consola no tiene errores |
 | 5 | `docker build` falla en `pnpm install --frozen-lockfile` con `getaddrinfo EAI_AGAIN registry.npmjs.org` | Fallo transitorio de DNS dentro de la build (el host y el contenedor resuelven bien al repetirlo) | Repetir el `docker build`; las capas ya descartadas se recuperan del cache | `docker build` termina con `Successfully tagged espa-p1:dev` |
 
 ## 12. Git y evidencias
 
 - **Ramas:** `main` (solo hitos, lleva los tags) ← `dev` (integración) ← ramas de tarea `<tipo>/<tema>` creadas desde `dev`.
 - **Integración:** Javier (dueño del proyecto Vercel) mergea las ramas a `dev` con merge commit (`--no-ff`), nunca squash, para conservar la autoría de cada commit. En la Fase 1, Nicolas integró sus dos ramas en `dev` con `--no-ff` y Pablo integra la suya de la misma forma.
-- **Commits:** Conventional Commits, en inglés, minúsculas e imperativo.
+- **Commits:** Conventional Commits (`tipo(scope opcional): descripción`), en español, en imperativo y sin punto final. Los anteriores a la Fase 5 están en inglés y no se reescriben.
 
 | Hito | Rama | Contenido |
 | --- | --- | --- |
@@ -284,5 +349,6 @@ Comprobaciones ejecutadas (2026-10-19, backend con `uvicorn` en `:8000` y `pnpm 
 | Fase 3 | `build/b-vercel-config` | `vercel.json` (Vite + rewrite `/api/*`), `.vercelignore` y documentación en §6 (Javier) |
 | Fase 3 | `docs/b-vercel-deploy` | `vercel link/deploy/deploy --prod` ejecutados y verificación de producción en §6 y §11 (Javier) |
 | Fase 5 | `build/a-dockerfile` | `Dockerfile` multi-stage, `docker_app.py` y `.dockerignore` + verificación local del contenedor (§8) (Pablo) |
+| Fase 5 | `docs/c-docker-verification` | Verificación local con autenticación, logs, parada/arranque y política de reinicio; procedencia de la imagen y procedimiento de actualización (§8 y §11) (Nicolas) |
 
 _Tags, releases y capturas: pendientes._
