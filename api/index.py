@@ -3,8 +3,9 @@ import os
 import random
 from datetime import date, time
 
+from clerk_backend_api import AuthenticateRequestOptions, authenticate_request
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from openai import APITimeoutError, OpenAI, OpenAIError
 from pydantic import BaseModel, Field
 
@@ -131,12 +132,39 @@ def llamar_ia_tarot(fecha: date, hora: time | None, signo: str, cartas: list[Car
     return lectura.strip()
 
 
+def _authorized_parties() -> list[str] | None:
+    partes = [
+        parte.strip()
+        for parte in os.getenv("CLERK_AUTHORIZED_PARTIES", "").split(",")
+        if parte.strip()
+    ]
+    return partes or None
+
+
+def require_auth(request: Request) -> None:
+    """Valida el token de sesión de Clerk. Sin sesión válida responde 401."""
+    estado = authenticate_request(
+        request,
+        AuthenticateRequestOptions(
+            secret_key=os.getenv("CLERK_SECRET_KEY"),
+            authorized_parties=_authorized_parties(),
+            accepts_token=["session_token"],
+        ),
+    )
+    if not estado.is_authenticated:
+        raise HTTPException(status_code=401, detail="No autenticado")
+
+
 @app.get("/api/health")
 def health() -> dict:
     return {"status": "ok"}
 
 
-@app.post("/api/generar", response_model=GenerarResponse)
+@app.post(
+    "/api/generar",
+    response_model=GenerarResponse,
+    dependencies=[Depends(require_auth)],
+)
 def generar(payload: GenerarRequest) -> GenerarResponse:
     try:
         resumen = llamar_ia(payload.texto)
@@ -154,7 +182,11 @@ def generar(payload: GenerarRequest) -> GenerarResponse:
     return GenerarResponse(resumen=resumen)
 
 
-@app.post("/api/tarot", response_model=TarotResponse)
+@app.post(
+    "/api/tarot",
+    response_model=TarotResponse,
+    dependencies=[Depends(require_auth)],
+)
 def tarot(payload: TarotRequest) -> TarotResponse:
     if payload.fecha > date.today():
         raise HTTPException(status_code=422, detail="La fecha de nacimiento no puede ser futura")
