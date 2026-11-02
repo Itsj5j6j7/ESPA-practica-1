@@ -27,13 +27,200 @@ body {
   animation: aparecer 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
-/* Calendario y reloj nativos en oscuro */
-input {
+/* Calendario, reloj y desplegables nativos en oscuro */
+input,
+select,
+textarea {
   color-scheme: dark;
 }
 
+/* Overlay de barajado mientras responde la IA */
+.barajado {
+  animation: aparecer-fundido 0.4s ease both;
+}
+
+@keyframes aparecer-fundido {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Halo giratorio detrás de la baraja */
+.aura {
+  position: absolute;
+  inset: 20px;
+  border-radius: 9999px;
+  background: conic-gradient(from 0deg, transparent, #7c3aed88, #e9c46a55, transparent 60%, #c026d388, transparent);
+  filter: blur(18px);
+  animation: girar 6s linear infinite;
+}
+
+.zodiaco {
+  position: absolute;
+  inset: 0;
+  animation: girar 40s linear infinite reverse;
+}
+
+.zodiaco span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: -0.6em 0 0 -0.5em;
+  font-size: 1.1rem;
+  color: #e9c46a99;
+  text-shadow: 0 0 8px #a78bfa;
+}
+
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* La baraja se balancea en 3D */
+.baraja {
+  position: relative;
+  width: 96px;
+  height: 154px;
+  perspective: 900px;
+  transform-style: preserve-3d;
+  animation: mecer 4s ease-in-out infinite;
+}
+
+@keyframes mecer {
+  0%,
+  100% {
+    transform: rotateX(12deg) rotateY(-10deg);
+  }
+  50% {
+    transform: rotateX(12deg) rotateY(10deg);
+  }
+}
+
+/* Dorso de carta: se corta en dos mitades, se mezcla en cascada y se abre en abanico */
+.carta-dorso {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 10px;
+  background: radial-gradient(circle at 50% 40%, #5b21b6, #1e0b3a 70%);
+  box-shadow:
+    0 0 18px -4px #a78bfa,
+    0 10px 24px rgb(0 0 0 / 0.6);
+  transform-origin: 50% 130%;
+  animation: barajar 3.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  animation-delay: calc(var(--i) * 45ms);
+}
+
+/* Reflejo que recorre cada dorso */
+.carta-dorso::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 35%, rgb(255 255 255 / 0.25) 50%, transparent 65%);
+  background-size: 250% 100%;
+  animation: reflejo 2.4s linear infinite;
+}
+
+.carta-dorso svg {
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes barajar {
+  0%,
+  100% {
+    transform: translateY(calc(var(--i) * -1px));
+  }
+  14%,
+  26% {
+    transform: translate(calc(var(--lado) * 70%), -8px) rotate(calc(var(--lado) * 14deg));
+  }
+  40% {
+    transform: translateY(calc(var(--i) * -1px));
+  }
+  52% {
+    transform: translateY(-16px);
+  }
+  66%,
+  82% {
+    transform: translateY(-34px) rotate(var(--abanico));
+  }
+}
+
+@keyframes reflejo {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+/* Destellos de fondo */
+.destello {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: #f5e6b8;
+  box-shadow: 0 0 10px 2px #c4b5fd;
+  animation: titilar 3s ease-in-out infinite;
+}
+
+@keyframes titilar {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.4);
+  }
+}
+
+/* Frases que se relevan cada 2,5 s */
+.frase {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  animation: frase 10s ease infinite both;
+}
+
+@keyframes frase {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  5%,
+  20% {
+    opacity: 1;
+    transform: none;
+  }
+  25%,
+  100% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .aparecer {
+  .aparecer,
+  .barajado,
+  .aura,
+  .zodiaco,
+  .baraja,
+  .carta-dorso,
+  .carta-dorso::after,
+  .destello {
     animation: none;
+  }
+  .frase:not(:first-child) {
+    display: none;
+  }
+  .frase:first-child {
+    animation: none;
+    opacity: 1;
   }
 }
