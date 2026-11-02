@@ -1,1 +1,39 @@
 @import "tailwindcss";
+
+@theme {
+  --font-display: "Cinzel", serif;
+  --font-body: "Roboto Flex", sans-serif;
+}
+
+body {
+  background: #05020a;
+  color: #e9e1ff;
+  font-family: var(--font-body);
+}
+
+/* Aparición escalonada de las cartas y la lectura */
+@keyframes aparecer {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.aparecer {
+  animation: aparecer 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* Calendario y reloj nativos en oscuro */
+input {
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aparecer {
+    animation: none;
+  }
+}
