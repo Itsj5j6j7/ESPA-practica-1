@@ -175,7 +175,35 @@ docker history espa-p1:dev
 | `docker stop espa && docker start espa` | `running` tras el reinicio y `GET /api/health` → `200` |
 | `docker history espa-p1:dev` | sin secretos: la búsqueda de prefijos de claves de API, IDs de AWS y claves privadas no devuelve resultados |
 
-_Pendiente (Fase 4 y 6):_ `.env` real con `AI_API_KEY` y `CLERK_*` para probar login y rechazo `401` dentro del contenedor, `--restart unless-stopped` y mapeo `80:8000` en EC2. El tag formal `v0.5-docker` se crea sobre `main` cuando estén integradas las tres ramas de la Fase 5.
+### Verificación con autenticación (2026-11-02, rama `docs/c-docker-verification`)
+
+La imagen se reconstruye con la clave publicable real y el contenedor se arranca con el `.env` completo. `CLERK_AUTHORIZED_PARTIES` debe incluir el origen desde el que se abre la SPA (`http://localhost:8000`), que no está en el `.env` de desarrollo (`:5173`); se añade con `-e`, que prevalece sobre `--env-file`:
+
+```bash
+set -a && . ./.env && set +a
+docker build --build-arg VITE_CLERK_PUBLISHABLE_KEY="$VITE_CLERK_PUBLISHABLE_KEY" -t espa-p1:dev -t espa-p1:$(git rev-parse --short HEAD) .
+docker run -d --name espa --restart unless-stopped -p 8000:8000 \
+  --env-file .env -e CLERK_AUTHORIZED_PARTIES="$CLERK_AUTHORIZED_PARTIES,http://localhost:8000" \
+  espa-p1:dev
+```
+
+| Comprobación | Resultado |
+| --- | --- |
+| `docker ps` | un solo contenedor `espa` (`espa-p1:dev`), `Up`, `0.0.0.0:8000->8000/tcp` |
+| `GET /api/health` | `200 {"status":"ok"}` (público) |
+| `GET /` en navegador headless (Chromium) | la SPA renderiza («Iniciar sesión» / «Registrarse»), sin errores de consola |
+| `POST /api/generar` y `/api/tarot` **sin** `Authorization` | `401 {"detail":"No autenticado"}` (lo devuelve FastAPI, no Vercel) |
+| `POST /api/generar` con `Authorization: Bearer abc.def.ghi` | `401 {"detail":"No autenticado"}` (firma inválida) |
+| Inicio de sesión en `http://localhost:8000` con una cuenta de prueba de Clerk y una lectura de tarot | `docker logs espa` muestra `POST /api/tarot … 200 OK`: el token de sesión llega a FastAPI y se valida dentro del contenedor |
+| `docker stop espa` y `docker start espa` | `exited` → `running`; con el contenedor parado el puerto no responde (`000`) y tras `start` `GET /api/health` → `200` |
+| `docker inspect -f '{{.HostConfig.RestartPolicy.Name}}' espa` y `docker restart espa` | `unless-stopped`; tras el reinicio `GET /api/health` → `200` |
+| `docker logs --tail 12 espa` | arranque de uvicorn y una línea por petición (`200`, `401`); nunca el cuerpo, el token ni las claves |
+| `docker history --no-trunc espa-p1:dev` + búsqueda de `sk-`, `sk_test_`/`sk_live_`, `BEGIN … PRIVATE KEY` y `AKIA` | 0 coincidencias |
+| `grep -rlF "$AI_API_KEY"` sobre el sistema de ficheros de la imagen | 0 ficheros; tampoco hay ningún `.env*` dentro de la imagen |
+
+El `ENV` de la imagen final solo contiene variables de la imagen base de Python; la clave publicable (pública por diseño) solo queda en el bundle de `dist/`. El aviso de `docker build` `SecretsUsedInArgOrEnv` sobre `VITE_CLERK_PUBLISHABLE_KEY` es un falso positivo por el nombre: es la clave publicable `pk_test_…`, que acaba en el JS que descarga cualquier navegador, y la etapa `web` no forma parte de la imagen final.
+
+_Pendiente (Fase 6):_ ejecutar el contenedor en EC2 (mapeo `80:8000`, `CLERK_AUTHORIZED_PARTIES` con `http://IP_EC2`). El tag formal `v0.5-docker` se crea sobre `main` cuando estén integradas las tres ramas de la Fase 5.
 
 ## 9. AWS
 
@@ -260,6 +288,7 @@ Comprobaciones ejecutadas (2026-10-19, backend con `uvicorn` en `:8000` y `pnpm 
 | 3 | `vercel link` termina con `Failed to connect Itsj5j6j7/ESPA-practica-1 to project` | La app de GitHub de Vercel no tenía acceso al repositorio | En GitHub → Settings → Applications → Vercel → Configure, dar acceso al repo y conectarlo en Project → Settings → Git | El proyecto muestra el repo conectado; `vercel deploy` no depende de esta conexión |
 | 3 | `vercel link` añade `.vercel` y `.env*` al `.gitignore` | La CLI lo hace sin mirar las reglas existentes; `.env*` volvería a ignorar `.env.example` | Descartar el cambio: `.vercel/` y `.env.*` (con `!.env.example`) ya estaban | `git check-ignore -v .env.local .vercel/project.json` los cubre y `.env.example` sigue versionado |
 | 5 | `docker version` → `permission denied while trying to connect to the docker API` | El usuario no pertenecía al grupo `docker` (el daemon estaba instalado y parado) | `sudo systemctl start docker` y `sudo usermod -aG docker $USER` + abrir una sesión nueva | `docker version --format '{{.Server.Version}}'` → `29.9.0` |
+| 5 | La SPA servida por el contenedor sale en blanco y la consola dice `Falta VITE_CLERK_PUBLISHABLE_KEY` | La imagen se construyó con la variable vacía (`.env` sin rellenar): Vite incrusta `VITE_*` en el bundle **al compilar**, así que pasarla luego con `--env-file` no sirve | Rellenar la clave en `.env` y volver a ejecutar `docker build --build-arg VITE_CLERK_PUBLISHABLE_KEY="$VITE_CLERK_PUBLISHABLE_KEY" …`; recrear el contenedor | La SPA muestra «Iniciar sesión» / «Registrarse» y la consola no tiene errores |
 | 5 | `docker build` falla en `pnpm install --frozen-lockfile` con `getaddrinfo EAI_AGAIN registry.npmjs.org` | Fallo transitorio de DNS dentro de la build (el host y el contenedor resuelven bien al repetirlo) | Repetir el `docker build`; las capas ya descartadas se recuperan del cache | `docker build` termina con `Successfully tagged espa-p1:dev` |
 
 ## 12. Git y evidencias
