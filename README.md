@@ -331,7 +331,7 @@ Comprobaciones ejecutadas (2026-10-19, backend con `uvicorn` en `:8000` y `pnpm 
 
 - **Ramas:** `main` (solo hitos, lleva los tags) ← `dev` (integración) ← ramas de tarea `<tipo>/<tema>` creadas desde `dev`.
 - **Integración:** Javier (dueño del proyecto Vercel) mergea las ramas a `dev` con merge commit (`--no-ff`), nunca squash, para conservar la autoría de cada commit. En la Fase 1, Nicolas integró sus dos ramas en `dev` con `--no-ff` y Pablo integra la suya de la misma forma.
-- **Commits:** Conventional Commits, en inglés, minúsculas e imperativo.
+- **Commits:** Conventional Commits (`tipo(scope opcional): descripción`), en español, en imperativo y sin punto final. Los anteriores a la Fase 5 están en inglés y no se reescriben.
 
 | Hito | Rama | Contenido |
 | --- | --- | --- |

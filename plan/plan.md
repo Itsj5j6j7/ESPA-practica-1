@@ -20,7 +20,7 @@ Para pedirle una fase a Claude y ver los pasos manuales en Vercel/Clerk/AWS: `gu
 | Auth | Clerk, instancia de **desarrollo**; `@clerk/react` (v6; `@clerk/clerk-react` está deprecado) + `clerk-backend-api` | Lo exige el enunciado; sin dominio propio |
 | Contenedor | Multi-stage: Node compila la SPA, Python sirve API + `dist/` en un solo proceso | 1 contenedor, sin Compose |
 | EC2 | Ubuntu LTS (como las guías G01–G17), puerto 80 → 8000 del contenedor | Coherente con las guías de AWS Academy |
-| Commits | Conventional Commits, inglés, minúsculas, imperativo | Convención personal del repo; el enunciado solo pide "significativos" |
+| Commits | Conventional Commits, **español** desde la Fase 5 (los anteriores están en inglés), imperativo, sin punto final | Convención del repo; el enunciado solo pide "significativos". Los mensajes de ejemplo de las tablas de fases están en inglés: se redactan en español |
 
 ### Contrato de la API (fijo desde la Fase 0; permite trabajar en paralelo)
 
