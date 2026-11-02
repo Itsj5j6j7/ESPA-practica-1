@@ -12,3 +12,5 @@ evidencias
 plan
 __pycache__
 .pytest_cache
+*.tar
+*.tar.gz
