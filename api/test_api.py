@@ -47,6 +47,19 @@ def test_generar_rejects_request_without_token():
     assert response.json() == {"detail": "No autenticado"}
 
 
+def test_generar_accepts_request_with_valid_token(monkeypatch):
+    monkeypatch.setattr("api.index.llamar_ia", lambda texto: "Resumen de prueba.")
+
+    response = client.post(
+        "/api/generar",
+        json={"texto": "Texto de prueba largo suficiente para resumir."},
+        headers=AUTH_HEADERS,
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"resumen": "Resumen de prueba."}
+
+
 def test_generar_happy_path_with_mocked_provider(monkeypatch):
     def proveedor_falso(texto: str) -> str:
         assert texto == "Texto de prueba largo suficiente para resumir."
@@ -116,6 +129,21 @@ def test_tarot_rejects_request_without_token():
 
     assert response.status_code == 401
     assert response.json() == {"detail": "No autenticado"}
+
+
+def test_tarot_accepts_request_with_valid_token(monkeypatch):
+    monkeypatch.setattr(
+        "api.index.llamar_ia_tarot", lambda *args: "Lectura de prueba."
+    )
+
+    response = client.post(
+        "/api/tarot",
+        json={"fecha": "2000-11-05", "hora": "14:30"},
+        headers=AUTH_HEADERS,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["lectura"] == "Lectura de prueba."
 
 
 def test_tarot_happy_path_with_mocked_provider(monkeypatch):
