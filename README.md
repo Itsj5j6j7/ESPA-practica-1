@@ -294,10 +294,10 @@ La aplicación **ya funciona en EC2** dentro de **un único contenedor**: la mis
 
 | Dato | Valor |
 | --- | --- |
-| Región | **[completar]** |
-| Sistema operativo (AMI) | **[completar]** (p. ej. Ubuntu 24.04 LTS) |
-| Tipo de instancia | **[completar]** (p. ej. `t3.micro`) |
-| IP pública / URL | `http://`**[completar]** |
+| Región | `us-east-1` |
+| Sistema operativo (AMI) | Ubuntu 24.04.4 LTS |
+| Tipo de instancia | `t3.micro` (instancia `fp-analytics-01`) |
+| IP pública / URL | `http://72.44.55.22` (IP elástica: no cambia al parar y arrancar la instancia) |
 | Imagen desplegada | `espa-p1:`**[completar: sha o tag]** (commit **[completar]**) |
 | Fecha del despliegue | **[completar]** |
 
@@ -306,7 +306,7 @@ La aplicación **ya funciona en EC2** dentro de **un único contenedor**: la mis
 | Protocolo | Puerto | Origen | Para qué |
 | --- | --- | --- | --- |
 | TCP | 22 (SSH) | **[completar: IP de cada integrante con /32]** | administración |
-| TCP | 80 (HTTP) | **[completar: `0.0.0.0/0` o la red del centro]** | la aplicación |
+| TCP | 80 (HTTP) | `0.0.0.0/0` | la aplicación |
 
 No hay ninguna otra regla: ni el 8000 (solo existe dentro del host) ni el socket de Docker (`2375/2376`) están expuestos. La clave `.pem` se guarda fuera del repositorio con permisos `400` (`*.pem` también está en `.dockerignore`).
 
