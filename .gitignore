@@ -18,3 +18,7 @@ dist/
 .idea/
 .DS_Store
 *.log
+
+# imágenes exportadas con docker save (se trasladan a EC2, no se versionan)
+*.tar
+*.tar.gz
