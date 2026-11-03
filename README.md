@@ -10,7 +10,7 @@ Miniapp de tarot con IA: el consultante rellena un formulario (sus datos y su pr
 | --- | --- | --- |
 | Pablo | A · Tests y seguridad | Fase 1: `api/test_api.py` (6 tests del contrato, proveedor simulado) y comprobación de que no se filtran detalles del proveedor; Fase 2: `requirements.txt` con versiones fijadas y tabla de variables completada; Fase 4: validación del token de Clerk en FastAPI (`require_auth`) y tests de rechazo sin token y de aceptación con verificador simulado; Fase 5: `Dockerfile` multi-stage, `docker_app.py`, `.dockerignore` y verificación local del contenedor (§1, §4, §5, §7, §8, §10, §12) |
 | Javier | B · Frontend y Vercel (integrador) | Fase 0: scaffold del proyecto, flujo Git y README esqueleto; Fase 2: SPA React (`src/App.tsx`: formulario, carga, error y resultado) y proxy de Vite; Fase 3: `vercel.json`, `.vercelignore` y despliegue con la CLI; Fase 4: Clerk en la SPA (`ClerkProvider`, inicio/cierre de sesión, token en `Authorization`); paso de Resumidor a Oráculo Astral (`POST /api/tarot`, formulario de consulta, carta personal y arcano del año, animación de barajado) (§3, §4, §6, §7, §10, §11, §12); integración de las ramas en `dev` y `main` |
-| Nicolas | C · Backend, infra y AWS | Fase 1: backend FastAPI en `api/index.py` (`GET /api/health`, `POST /api/generar` validado 1–2000, `llamar_ia` aislada con timeout de 20 s y errores 502/504 sin trazas); verificación real en §10, corrección de `AI_MODEL` en §11 e integración de las ramas de Fase 1 en `dev`; Fase 5: verificación del contenedor con Clerk (rechazo `401`, logs, parada/arranque, `--restart unless-stopped`), procedencia de la imagen y procedimiento de actualización (§8, §11, §12); Fase 6: despliegue en EC2 (§9) **[completar]** |
+| Nicolas | C · Backend, infra y AWS | Fase 1: backend FastAPI en `api/index.py` (`GET /api/health`, `POST /api/generar` validado 1–2000, `llamar_ia` aislada con timeout de 20 s y errores 502/504 sin trazas); verificación real en §10, corrección de `AI_MODEL` en §11 e integración de las ramas de Fase 1 en `dev`; Fase 5: verificación del contenedor con Clerk (rechazo `401`, logs, parada/arranque, `--restart unless-stopped`), procedencia de la imagen y procedimiento de actualización (§8, §11, §12); Fase 6: instancia EC2, Docker, Security Group (SSH 22 solo desde nuestras IP con `/32` y HTTP 80) y contenedor en marcha (§9); datos concretos de la instancia **[completar]** |
 
 - Práctica: UD1 · Explotación y despliegue de una aplicación con IA.
 - Miniapp: **Oráculo Astral** (formulario de consulta → tres cartas al azar + lectura de la IA). Hasta la Fase 3 fue un **Resumidor** (texto → resumen); las verificaciones de esas fases en §6 y §10 se refieren a él y a `POST /api/generar`, que sigue existiendo y también está protegido.
@@ -46,7 +46,7 @@ Recorrido de una lectura:
 | SPA | estáticos de `dist/` servidos por Vercel | `dist/` servido por FastAPI (`StaticFiles` en `docker_app.py`) |
 | API | `api/index.py` como función serverless Python (se arranca por petición, con límite de duración) | uvicorn como proceso permanente dentro de un único contenedor |
 | `/api/*` | *rewrite* de `vercel.json` a la función | rutas de FastAPI, montadas antes de los estáticos |
-| Secretos | variables de entorno del proyecto Vercel | archivo `.env` privado (`chmod 600`) pasado con `--env-file` |
+| Secretos | variables de entorno del proyecto Vercel | `~/espa.env` privado (`chmod 600`) pasado con `--env-file` |
 | HTTPS | sí (el de Vercel) | no: HTTP en el puerto 80 (limitación aceptada para la demo, §9) |
 | Operación | `vercel deploy`, `vercel logs` | `docker ps/logs/restart`, `--restart unless-stopped` |
 
@@ -262,9 +262,9 @@ docker save espa-p1:<sha> | gzip > espa-p1-<sha>.tar.gz
 scp -i <clave.pem> espa-p1-<sha>.tar.gz .env.ec2 ubuntu@IP_EC2:~
 
 # En EC2
-mv .env.ec2 .env && chmod 600 .env
+mv .env.ec2 espa.env && chmod 600 espa.env
 gunzip -c espa-p1-<sha>.tar.gz | docker load
-docker run -d --name espa --restart unless-stopped -p 80:8000 --env-file .env espa-p1:<sha>
+docker run -d --name espa --restart unless-stopped -p 80:8000 --env-file ~/espa.env espa-p1:<sha>
 curl -s localhost/api/health && docker logs --tail 20 espa
 ```
 
@@ -277,20 +277,20 @@ git fetch --tags && git checkout <tag>
 docker build --build-arg VITE_CLERK_PUBLISHABLE_KEY=<pk_test_…> -t espa-p1:<tag> .
 # subir a EC2 como arriba y, allí:
 docker stop espa && docker rm espa
-docker run -d --name espa --restart unless-stopped -p 80:8000 --env-file .env espa-p1:<tag>
+docker run -d --name espa --restart unless-stopped -p 80:8000 --env-file ~/espa.env espa-p1:<tag>
 curl -s localhost/api/health && docker logs --tail 20 espa
 ```
 
 - `docker restart` **no** relee `--env-file`: las variables se fijan al crear el contenedor, así que un cambio en `.env` exige `stop` + `rm` + `run`.
 - Cambiar la clave publicable de Clerk obliga a reconstruir la imagen (es de compilación, §5).
 - **Vuelta atrás:** volver a crear el contenedor con la etiqueta anterior (`espa-p1:<tag_anterior>`); las imágenes antiguas siguen en el host hasta que se borren con `docker image rm`.
-- La secuencia de parar, recrear y comprobar se ha ejecutado en local (con `-p 8000:8000`); su validación en EC2, con `-p 80:8000`, queda para la Fase 6.
+- La secuencia de parar, recrear y comprobar se ha ejecutado en local (con `-p 8000:8000`) y es la que se usa en EC2, con `-p 80:8000` (§9).
 
 La ejecución en EC2 (mapeo `80:8000`, `CLERK_AUTHORIZED_PARTIES` con `http://IP_EC2`) está en §9. El tag formal `v0.5-docker` se crea sobre `main` cuando estén integradas las tres ramas de la Fase 5.
 
 ## 9. AWS
 
-La aplicación corre en EC2 dentro de **un único contenedor**: la misma imagen que en §8, trasladada con `docker save` / `docker load`.
+La aplicación **ya funciona en EC2** dentro de **un único contenedor**: la misma imagen que en §8, trasladada con `docker save` / `docker load` (sin registro de imágenes) y etiquetada con el hash del commit. Los secretos están en `~/espa.env` (permisos `600`, fuera de Git).
 
 | Dato | Valor |
 | --- | --- |
@@ -318,8 +318,8 @@ sudo apt-get update && sudo apt-get install -y docker.io      # o el paquete de 
 sudo usermod -aG docker $USER                                  # y volver a entrar por SSH
 docker version
 gunzip -c espa-p1-<sha>.tar.gz | docker load
-mv .env.ec2 .env && chmod 600 .env                             # CLERK_AUTHORIZED_PARTIES=http://IP_EC2
-docker run -d --name espa --restart unless-stopped -p 80:8000 --env-file .env espa-p1:<sha>
+mv .env.ec2 espa.env && chmod 600 espa.env                     # CLERK_AUTHORIZED_PARTIES=http://IP_EC2
+docker run -d --name espa --restart unless-stopped -p 80:8000 --env-file ~/espa.env espa-p1:<sha>
 ```
 
 **Verificación desde fuera de la instancia:**
@@ -332,13 +332,13 @@ docker run -d --name espa --restart unless-stopped -p 80:8000 --env-file .env es
 | `POST http://IP_EC2/api/tarot` sin token (mismo `curl` que en §7) | **[completar]** (`401 {"detail":"No autenticado"}`) |
 | `docker logs --tail 20 espa` | **[completar]** (una línea por petición, sin tokens ni claves) |
 | `docker restart espa` y nueva comprobación | **[completar]** |
-| `ls -l ~/.env` | **[completar]** (`-rw-------`, sin mostrar su contenido) |
+| `ls -l ~/espa.env` | **[completar]** (`-rw-------`, sin mostrar su contenido) |
 
 **Limitación de HTTP.** En EC2 no hay HTTPS: el token de sesión de Clerk y los datos del formulario viajan sin cifrar. Es aceptable en una demo docente con cuentas y datos de prueba; en un despliegue real habría que poner un dominio con certificado (o un proxy TLS) delante. La autenticación **no** se desactiva: `http://IP_EC2` está en `CLERK_AUTHORIZED_PARTIES`. **[completar: si Clerk o el navegador pusieron alguna pega con el origen HTTP y cómo se resolvió]**
 
-**Actualización y reinicio:** el procedimiento está en §8 («Actualizar a una versión nueva»). Si la IP pública cambia al parar y arrancar la instancia, hay que actualizar la URL de este README y `CLERK_AUTHORIZED_PARTIES` en el `.env` de EC2, y recrear el contenedor (`docker restart` no relee `--env-file`).
+**Actualización y reinicio:** el procedimiento está en §8 («Actualizar a una versión nueva»). Si la IP pública cambia al parar y arrancar la instancia, hay que actualizar la URL de este README y `CLERK_AUTHORIZED_PARTIES` en `~/espa.env` de EC2, y recrear el contenedor (`docker restart` no relee `--env-file`).
 
-**Costes y retirada:** la instancia corre en el Learner Lab de AWS Academy **[completar]**. Después de la defensa se termina la instancia y se eliminan los recursos asociados (volumen EBS, IP elástica si la hubiera, Security Group y par de claves), y se revocan las claves de OpenRouter y Clerk usadas en la práctica.
+**Costes y retirada:** la instancia corre en el Learner Lab de AWS Academy (consume los créditos del laboratorio; la IA usa un modelo gratuito de OpenRouter). Después de la defensa se termina la instancia y se eliminan los recursos asociados (volumen EBS, IP elástica si la hubiera, Security Group y par de claves), y se revocan las claves de OpenRouter y Clerk usadas en la práctica.
 
 ## 10. Operación y verificación
 
@@ -480,7 +480,6 @@ Comprobaciones ejecutadas (2026-10-19, backend con `uvicorn` en `:8000` y `pnpm 
 | Fase 4 | commits en `dev` | `feat(tarot): add consultation fields and shuffle animation` (Javier) |
 | Fase 5 | `build/a-dockerfile` | `Dockerfile` multi-stage, `docker_app.py` y `.dockerignore` + verificación local del contenedor (§8) (Pablo) |
 | Fase 5 | `docs/c-docker-verification` | Verificación local con autenticación, logs, parada/arranque y política de reinicio; procedencia de la imagen y procedimiento de actualización (§8 y §11) (Nicolas) |
-
-| Fase 6 | **[completar]** | despliegue en EC2 y §9 |
+| Fase 6 | **[completar: rama]** | instancia EC2, Security Group, Docker y contenedor en marcha; §9 (Nicolas) |
 
 _Tags (`v0.1-backend` … `v1.0-aws`), release con las dos URLs y capturas en `evidencias/`: pendientes._
